@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Trial - Clean Edition</title>
+    <title>Neon Trial - Clean & Dynamic</title>
     <style>
         :root {
             --bg-color: #0b0c10;
@@ -23,7 +23,7 @@
             align-items: center;
             height: 100vh;
             overflow: hidden;
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Segoe UI', Roboto, sans-serif;
             touch-action: none; 
         }
 
@@ -51,7 +51,7 @@
             text-transform: uppercase;
         }
 
-        .score-num { color: var(--neon-alt); }
+        .score-num { color: var(--neon-alt); text-shadow: 0 0 10px var(--neon-alt); }
     </style>
 </head>
 <body>
@@ -78,8 +78,7 @@
         const maxDragDistance = 220;
         let score = 0;
         
-        let cameraX = 0, targetCameraX = 0;
-        let cameraY = 0, targetCameraY = 0;
+        let cameraX = 0, cameraY = 0;
         let genX = 0, genY = 600;
 
         const getCSSVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -97,7 +96,7 @@
 
         let bike = {
             x: 100, y: 550, vx: 0, vy: 0, radius: 15, 
-            angle: 0, angVel: 0, grounded: false, dir: 1, tuckFactor: 0
+            angle: 0, angVel: 0, grounded: false, tuckFactor: 0
         };
 
         let terrain = [];
@@ -109,7 +108,7 @@
             let type = Math.floor(Math.random() * 6);
             
             if (genY < 300) type = Math.max(type, 3);
-            if (genY > 700) type = Math.min(type, 2);
+            if (genY > 750) type = Math.min(type, 2);
 
             let w = 40 + Math.random() * 80;
             let y = genY + (Math.random() * 300 - 150);
@@ -123,14 +122,14 @@
                 genX = startX + r * 2; genY = y - r;
             } else if (type === 2 || type === 3) { // Steps
                 let stepW = 40, currX = startX, currY = genY;
-                let dirY = type === 2 ? -40 : 40;
+                let dirY = type === 2 ? -45 : 45;
                 for(let i=0; i<3; i++) {
                     terrain.push({type: 'rect', x: currX, y: currY, w: stepW, h: 40, landed: false});
                     currX += stepW + 20; currY += dirY;
                 }
                 genX = currX; genY = currY - dirY;
             } else { // Slope
-                let angle = type === 4 ? -0.4 : 0.4;
+                let angle = type === 4 ? -0.45 : 0.45;
                 let sw = 100 + Math.random() * 50;
                 terrain.push({type: 'slope', x: startX, y: genY, w: sw, h: 20, angle: angle, landed: false});
                 genX = startX + sw * Math.cos(angle); genY = genY + sw * Math.sin(angle);
@@ -140,16 +139,15 @@
         function initGame() {
             score = 0; terrain = []; scoreDisplay.innerText = "0";
             cameraX = 0; cameraY = 0; genX = 1600; genY = 600;
-            bike = { x: 100, y: 550, vx: 0, vy: 0, radius: 15, angle: 0, angVel: 0, grounded: true, dir: 1, tuckFactor: 0 };
+            bike = { x: 100, y: 550, vx: 0, vy: 0, radius: 15, angle: 0, angVel: 0, grounded: true, tuckFactor: 0 };
             
             terrain.push({ type: 'rect', x: -500, y: 600, w: 2100, h: 200, landed: true });
-            terrain.push({ type: 'rect', x: 400, y: 520, w: 150, h: 30, landed: false });
-            terrain.push({ type: 'rect', x: 700, y: 440, w: 120, h: 30, landed: false });
+            terrain.push({ type: 'rect', x: 450, y: 530, w: 150, h: 30, landed: false });
+            terrain.push({ type: 'rect', x: 750, y: 460, w: 120, h: 30, landed: false });
             
             tutorialTexts = [
-                { t: "DRAG BACK TO AIM", x: 200, y: 480 },
-                { t: "RELEASE TO JUMP", x: 200, y: 520 },
-                { t: "LAND ON TOP FOR POINTS", x: 700, y: 350 }
+                { t: "DRAG BACK TO AIM", x: 250, y: 480 },
+                { t: "LAND ON YELLOW FOR POINTS", x: 800, y: 350 }
             ];
 
             for(let i=0; i<10; i++) generateObstacle();
@@ -188,13 +186,15 @@
 
             bike.vy += gravity;
             if (isDragging && bike.grounded) {
-                let tilt = Math.max(-0.6, Math.min(0.6, (dragCurrent.x - dragStart.x) / maxDragDistance));
-                bike.angle += (tilt - bike.angle) * 0.2;
+                let tilt = Math.max(-0.65, Math.min(0.65, (dragCurrent.x - dragStart.x) / maxDragDistance));
+                bike.angle += (tilt - bike.angle) * 0.15;
             }
 
             bike.x += bike.vx; bike.y += bike.vy; bike.angle += bike.angVel;
-            
-            if (bike.x > genX - 1000) generateObstacle();
+            if (bike.x > genX - 1200) generateObstacle();
+
+            if (!bike.grounded) bike.tuckFactor = Math.min(1, bike.tuckFactor + 0.1);
+            else bike.tuckFactor = Math.max(0, bike.tuckFactor - 0.2);
 
             let groundedThisFrame = false;
             const pts = [{dx: -25, dy: 10}, {dx: 30, dy: 10}, {dx: 0, dy: 0}];
@@ -202,7 +202,6 @@
             pts.forEach(p => {
                 let wx = bike.x + Math.cos(bike.angle)*p.dx - Math.sin(bike.angle)*p.dy;
                 let wy = bike.y + Math.sin(bike.angle)*p.dx + Math.cos(bike.angle)*p.dy;
-                
                 terrain.forEach(t => {
                     let c = checkCollision(wx, wy, 12, t);
                     if (c.hit) {
@@ -218,16 +217,16 @@
                 });
             });
 
-            // Head death
-            let hx = bike.x + Math.cos(bike.angle)*10 - Math.sin(bike.angle)*-50;
-            let hy = bike.y + Math.sin(bike.angle)*10 + Math.cos(bike.angle)*-50;
-            terrain.forEach(t => { if(checkCollision(hx, hy, 10, t).hit) gameState = STATE_GAMEOVER; });
+            // Head death check
+            let hx = bike.x + Math.cos(bike.angle)*10 - Math.sin(bike.angle)*-55;
+            let hy = bike.y + Math.sin(bike.angle)*10 + Math.cos(bike.angle)*-55;
+            terrain.forEach(t => { if(checkCollision(hx, hy, 12, t).hit) gameState = STATE_GAMEOVER; });
 
             bike.grounded = groundedThisFrame;
-            if (bike.y > cameraY + 1200) gameState = STATE_GAMEOVER;
+            if (bike.y > cameraY + 1300) gameState = STATE_GAMEOVER;
 
-            targetCameraX = bike.x - 150; targetCameraY = bike.y - 600;
-            cameraX += (targetCameraX - cameraX) * 0.1; cameraY += (targetCameraY - cameraY) * 0.1;
+            cameraX += (bike.x - 150 - cameraX) * 0.1;
+            cameraY += (bike.y - 650 - cameraY) * 0.1;
         }
 
         function draw() {
@@ -246,7 +245,7 @@
             ctx.save(); ctx.translate(-cameraX, -cameraY);
 
             // Tutorial
-            ctx.fillStyle = "rgba(255,255,255,0.3)"; ctx.font = "20px monospace";
+            ctx.fillStyle = "rgba(0, 243, 255, 0.4)"; ctx.font = "bold 22px sans-serif"; ctx.textAlign = "center";
             tutorialTexts.forEach(t => ctx.fillText(t.t, t.x, t.y));
 
             // Terrain
@@ -268,7 +267,7 @@
                 }
             });
 
-            // Input
+            // Slingshot
             if (isDragging && bike.grounded) {
                 let dx = dragStart.x - dragCurrent.x, dy = dragStart.y - dragCurrent.y;
                 ctx.setLineDash([5, 5]); ctx.strokeStyle = colors.main;
@@ -276,17 +275,32 @@
                 ctx.setLineDash([]);
             }
 
-            // Bike (Simplified Clean)
+            // Bike & Rider
             ctx.save(); ctx.translate(bike.x, bike.y); ctx.rotate(bike.angle);
+            
+            // Wheels
             ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
-            ctx.beginPath(); ctx.arc(-25, 10, 12, 0, 7); ctx.stroke(); // Back wheel
-            ctx.beginPath(); ctx.arc(30, 10, 12, 0, 7); ctx.stroke();  // Front wheel
-            ctx.beginPath(); ctx.moveTo(-25, 10); ctx.lineTo(0, 10); ctx.lineTo(20, -15); ctx.lineTo(30, 10); // Frame
+            ctx.beginPath(); ctx.arc(-25, 10, 12, 0, 7); ctx.stroke();
+            ctx.beginPath(); ctx.arc(30, 10, 12, 0, 7); ctx.stroke();
+            
+            // Frame
+            ctx.strokeStyle = "rgba(100,105,115,1)";
+            ctx.beginPath(); ctx.moveTo(-25, 10); ctx.lineTo(0, 10); ctx.lineTo(20, -15); ctx.lineTo(30, 10);
             ctx.lineTo(20, -15); ctx.lineTo(-10, 0); ctx.lineTo(-25, 10); ctx.stroke();
-            // Rider
-            ctx.strokeStyle = colors.main; ctx.beginPath();
-            ctx.moveTo(-10, 0); ctx.lineTo(5, -40); ctx.lineTo(20, -15); // Body & Arms
-            ctx.stroke(); ctx.beginPath(); ctx.arc(8, -50, 7, 0, 7); ctx.fillStyle = colors.main; ctx.fill();
+            
+            // Rider Animation
+            let butt = {x: -12 + (bike.tuckFactor * 8), y: -22 + (bike.tuckFactor * 5)};
+            let shoulder = {x: 5 + (bike.tuckFactor * 10), y: -45 + (bike.tuckFactor * 10)};
+            let head = {x: shoulder.x + 5, y: shoulder.y - 10};
+            
+            ctx.strokeStyle = colors.main; ctx.shadowBlur = 10; ctx.shadowColor = colors.main;
+            ctx.beginPath(); 
+            ctx.moveTo(0, 10); ctx.lineTo(butt.x, butt.y); // Leg
+            ctx.lineTo(shoulder.x, shoulder.y); // Torso
+            ctx.lineTo(20, -15); // Arm
+            ctx.stroke();
+            
+            ctx.beginPath(); ctx.arc(head.x, head.y, 8, 0, 7); ctx.fillStyle = colors.main; ctx.fill();
             ctx.restore();
 
             ctx.restore();
@@ -296,39 +310,32 @@
                 ctx.fillStyle = colors.alt; ctx.font = "bold 50px sans-serif"; ctx.textAlign = "center";
                 ctx.fillText("CRASHED", canvas.width/2, canvas.height/2);
                 ctx.font = "20px sans-serif"; ctx.fillStyle = "#fff";
-                ctx.fillText("TAP TO RESTART", canvas.width/2, canvas.height/2 + 50);
+                ctx.fillText("TAP TO RESTART", canvas.width/2, canvas.height/2 + 55);
             }
         }
 
         function loop() { update(); draw(); requestAnimationFrame(loop); }
 
-        canvas.addEventListener('mousedown', e => { 
-            const p = {x: e.clientX, y: e.clientY};
+        function handleStart(e) {
+            const p = {x: e.clientX || e.touches[0].clientX, y: e.clientY || e.touches[0].clientY};
             if(gameState === STATE_GAMEOVER) initGame();
             else if(bike.grounded) { isDragging = true; dragStart = p; dragCurrent = p; }
-        });
-        window.addEventListener('mousemove', e => { if(isDragging) dragCurrent = {x: e.clientX, y: e.clientY}; });
-        window.addEventListener('mouseup', () => {
+        }
+        function handleMove(e) { if(isDragging) dragCurrent = {x: e.clientX || e.touches[0].clientX, y: e.clientY || e.touches[0].clientY}; }
+        function handleEnd() {
             if(isDragging) {
                 let dx = dragStart.x - dragCurrent.x, dy = dragStart.y - dragCurrent.y;
                 bike.vx = dx * jumpPower; bike.vy = dy * jumpPower;
                 bike.angVel = dx * -0.0003; bike.grounded = false; isDragging = false;
             }
-        });
+        }
 
-        canvas.addEventListener('touchstart', e => {
-            const p = {x: e.touches[0].clientX, y: e.touches[0].clientY};
-            if(gameState === STATE_GAMEOVER) initGame();
-            else if(bike.grounded) { isDragging = true; dragStart = p; dragCurrent = p; }
-        });
-        canvas.addEventListener('touchmove', e => { if(isDragging) dragCurrent = {x: e.touches[0].clientX, y: e.touches[0].clientY}; });
-        canvas.addEventListener('touchend', () => {
-            if(isDragging) {
-                let dx = dragStart.x - dragCurrent.x, dy = dragStart.y - dragCurrent.y;
-                bike.vx = dx * jumpPower; bike.vy = dy * jumpPower;
-                bike.angVel = dx * -0.0003; bike.grounded = false; isDragging = false;
-            }
-        });
+        canvas.addEventListener('mousedown', handleStart);
+        window.addEventListener('mousemove', handleMove);
+        window.addEventListener('mouseup', handleEnd);
+        canvas.addEventListener('touchstart', handleStart);
+        canvas.addEventListener('touchmove', handleMove);
+        window.addEventListener('touchend', handleEnd);
 
         initGame(); loop();
     </script>
