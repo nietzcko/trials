@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Trial - Clean & Dynamic</title>
+    <title>Neon Trial - Pro Physics</title>
     <style>
         :root {
             --bg-color: #0b0c10;
@@ -81,18 +81,18 @@
         let cameraX = 0, cameraY = 0;
         let genX = 0, genY = 600;
 
-        const getCSSVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
         const colors = {
-            main: getCSSVar('--neon-main'),
-            alt: getCSSVar('--neon-alt'),
-            platform: getCSSVar('--platform-body'),
-            bg: getCSSVar('--bg-color'),
-            grid: getCSSVar('--grid-color')
+            main: '#00f3ff',
+            alt: '#ffd700',
+            platform: '#1c232d',
+            bg: '#0b0c10',
+            grid: '#1f2833'
         };
 
         const gravity = 0.4;
         const jumpPower = 0.045;
         const bounceFactor = 0.3;
+        const rotLimit = 0.8; // Max dőlésszög radiánban (kb 45 fok)
 
         let bike = {
             x: 100, y: 550, vx: 0, vy: 0, radius: 15, 
@@ -107,20 +107,20 @@
             let startX = genX + gapX;
             let type = Math.floor(Math.random() * 6);
             
-            if (genY < 300) type = Math.max(type, 3);
+            if (genY < 350) type = Math.max(type, 3);
             if (genY > 750) type = Math.min(type, 2);
 
             let w = 40 + Math.random() * 80;
             let y = genY + (Math.random() * 300 - 150);
 
-            if (type === 0) { // Rect
+            if (type === 0) { 
                 terrain.push({type: 'rect', x: startX, y: y, w: w, h: 40, landed: false});
                 genX = startX + w; genY = y;
-            } else if (type === 1) { // Circle
+            } else if (type === 1) { 
                 let r = 25 + Math.random() * 20;
                 terrain.push({type: 'circle', x: startX + r, y: y, r: r, landed: false});
                 genX = startX + r * 2; genY = y - r;
-            } else if (type === 2 || type === 3) { // Steps
+            } else if (type === 2 || type === 3) { 
                 let stepW = 40, currX = startX, currY = genY;
                 let dirY = type === 2 ? -45 : 45;
                 for(let i=0; i<3; i++) {
@@ -128,7 +128,7 @@
                     currX += stepW + 20; currY += dirY;
                 }
                 genX = currX; genY = currY - dirY;
-            } else { // Slope
+            } else { 
                 let angle = type === 4 ? -0.45 : 0.45;
                 let sw = 100 + Math.random() * 50;
                 terrain.push({type: 'slope', x: startX, y: genY, w: sw, h: 20, angle: angle, landed: false});
@@ -143,11 +143,10 @@
             
             terrain.push({ type: 'rect', x: -500, y: 600, w: 2100, h: 200, landed: true });
             terrain.push({ type: 'rect', x: 450, y: 530, w: 150, h: 30, landed: false });
-            terrain.push({ type: 'rect', x: 750, y: 460, w: 120, h: 30, landed: false });
             
             tutorialTexts = [
-                { t: "DRAG BACK TO AIM", x: 250, y: 480 },
-                { t: "LAND ON YELLOW FOR POINTS", x: 800, y: 350 }
+                { t: "DRAG BACK TO LOAD", x: 250, y: 480 },
+                { t: "NO BACKFLIPS ALLOWED", x: 800, y: 350 }
             ];
 
             for(let i=0; i<10; i++) generateObstacle();
@@ -185,12 +184,24 @@
             if (gameState !== STATE_PLAYING) return;
 
             bike.vy += gravity;
+            
+            // Forgás lassítása a levegőben (damping)
+            if (!bike.grounded) {
+                bike.angVel *= 0.96; 
+            }
+
             if (isDragging && bike.grounded) {
                 let tilt = Math.max(-0.65, Math.min(0.65, (dragCurrent.x - dragStart.x) / maxDragDistance));
                 bike.angle += (tilt - bike.angle) * 0.15;
             }
 
-            bike.x += bike.vx; bike.y += bike.vy; bike.angle += bike.angVel;
+            bike.x += bike.vx; bike.y += bike.vy; 
+            bike.angle += bike.angVel;
+
+            // Rotation Limit (Nincs szaltó)
+            if (bike.angle > rotLimit) { bike.angle = rotLimit; bike.angVel = 0; }
+            if (bike.angle < -rotLimit) { bike.angle = -rotLimit; bike.angVel = 0; }
+
             if (bike.x > genX - 1200) generateObstacle();
 
             if (!bike.grounded) bike.tuckFactor = Math.min(1, bike.tuckFactor + 0.1);
@@ -212,12 +223,12 @@
                             if (!t.landed) { t.landed = true; score++; scoreDisplay.innerText = score; }
                         } else {
                             bike.vx *= -bounceFactor; bike.vy *= -bounceFactor;
+                            bike.angVel *= 0.5;
                         }
                     }
                 });
             });
 
-            // Head death check
             let hx = bike.x + Math.cos(bike.angle)*10 - Math.sin(bike.angle)*-55;
             let hy = bike.y + Math.sin(bike.angle)*10 + Math.cos(bike.angle)*-55;
             terrain.forEach(t => { if(checkCollision(hx, hy, 12, t).hit) gameState = STATE_GAMEOVER; });
@@ -232,7 +243,6 @@
         function draw() {
             ctx.fillStyle = colors.bg; ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // Grid
             ctx.strokeStyle = colors.grid; ctx.lineWidth = 1;
             let gridSize = 100;
             for(let x = -cameraX % gridSize; x < canvas.width; x += gridSize) {
@@ -244,16 +254,10 @@
 
             ctx.save(); ctx.translate(-cameraX, -cameraY);
 
-            // Tutorial
-            ctx.fillStyle = "rgba(0, 243, 255, 0.4)"; ctx.font = "bold 22px sans-serif"; ctx.textAlign = "center";
-            tutorialTexts.forEach(t => ctx.fillText(t.t, t.x, t.y));
-
-            // Terrain
             terrain.forEach(t => {
                 ctx.fillStyle = colors.platform;
                 let stroke = t.landed ? colors.alt : colors.main;
                 ctx.strokeStyle = stroke; ctx.lineWidth = 3;
-                
                 if (t.type === 'rect') {
                     ctx.fillRect(t.x, t.y, t.w, t.h);
                     ctx.beginPath(); ctx.moveTo(t.x, t.y); ctx.lineTo(t.x + t.w, t.y); ctx.stroke();
@@ -267,7 +271,6 @@
                 }
             });
 
-            // Slingshot
             if (isDragging && bike.grounded) {
                 let dx = dragStart.x - dragCurrent.x, dy = dragStart.y - dragCurrent.y;
                 ctx.setLineDash([5, 5]); ctx.strokeStyle = colors.main;
@@ -275,22 +278,32 @@
                 ctx.setLineDash([]);
             }
 
-            // Bike & Rider
+            // --- BIKE & RIDER ---
             ctx.save(); ctx.translate(bike.x, bike.y); ctx.rotate(bike.angle);
             
-            // Wheels
             ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
             ctx.beginPath(); ctx.arc(-25, 10, 12, 0, 7); ctx.stroke();
             ctx.beginPath(); ctx.arc(30, 10, 12, 0, 7); ctx.stroke();
             
-            // Frame
             ctx.strokeStyle = "rgba(100,105,115,1)";
             ctx.beginPath(); ctx.moveTo(-25, 10); ctx.lineTo(0, 10); ctx.lineTo(20, -15); ctx.lineTo(30, 10);
             ctx.lineTo(20, -15); ctx.lineTo(-10, 0); ctx.lineTo(-25, 10); ctx.stroke();
             
-            // Rider Animation
-            let butt = {x: -12 + (bike.tuckFactor * 8), y: -22 + (bike.tuckFactor * 5)};
-            let shoulder = {x: 5 + (bike.tuckFactor * 10), y: -45 + (bike.tuckFactor * 10)};
+            // Rider Animation Logic
+            let dragX = isDragging ? (dragCurrent.x - dragStart.x) : 0;
+            let dragY = isDragging ? (dragCurrent.y - dragStart.y) : 0;
+            let dragFactorX = Math.max(-1, Math.min(1, dragX / 100));
+            let dragFactorY = Math.max(-1, Math.min(1, dragY / 100));
+
+            // Butt moves back and down during load
+            let butt = {
+                x: -12 + (bike.tuckFactor * 8) + (dragFactorX * 10), 
+                y: -22 + (bike.tuckFactor * 5) - (dragFactorY * 5)
+            };
+            let shoulder = {
+                x: 5 + (bike.tuckFactor * 10) + (dragFactorX * 5), 
+                y: -45 + (bike.tuckFactor * 10) - (dragFactorY * 3)
+            };
             let head = {x: shoulder.x + 5, y: shoulder.y - 10};
             
             ctx.strokeStyle = colors.main; ctx.shadowBlur = 10; ctx.shadowColor = colors.main;
@@ -326,7 +339,8 @@
             if(isDragging) {
                 let dx = dragStart.x - dragCurrent.x, dy = dragStart.y - dragCurrent.y;
                 bike.vx = dx * jumpPower; bike.vy = dy * jumpPower;
-                bike.angVel = dx * -0.0003; bike.grounded = false; isDragging = false;
+                bike.angVel = dx * -0.00015; // Még lassabb kezdő forgás
+                bike.grounded = false; isDragging = false;
             }
         }
 
