@@ -3,16 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Trial - Vertical Survival</title>
+    <title>Neon Trial - Clean Edition</title>
     <style>
         :root {
-            /* Minimalista Neon Paletta: Fekete, Szürke, Világostürkiz, Sárga */
             --bg-color: #0b0c10;
-            --platform-body: #171d25;
-            --neon-main: #00f3ff; /* Világostürkiz (Türkizkék) */
-            --neon-alt: #ffd700;  /* Sárga */
-            --neon-scored: var(--neon-alt); /* Megegyezik a sárgával a pontszerzéshez */
-            --text-color: #c5c6c7;
+            --grid-color: #1f2833;
+            --platform-body: #1c232d;
+            --neon-main: #00f3ff;
+            --neon-alt: #ffd700;
+            --text-color: #ffffff;
         }
 
         body {
@@ -24,54 +23,41 @@
             align-items: center;
             height: 100vh;
             overflow: hidden;
-            font-family: system-ui, -apple-system, sans-serif;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             touch-action: none; 
-            color: var(--text-color);
         }
 
         canvas {
-            box-shadow: 0 0 50px rgba(0, 0, 0, 0.9);
             max-width: 100vw;
             max-height: 100vh;
             width: 100%;
             height: 100%;
             object-fit: contain;
-            cursor: crosshair;
         }
 
         #ui-top {
             position: absolute;
             top: 40px;
-            left: 50%;
-            transform: translateX(-50%);
-            pointer-events: none;
             width: 100%;
             text-align: center;
+            pointer-events: none;
         }
 
         .hud {
-            display: inline-block;
             font-weight: 900;
-            font-size: 1.5rem;
+            font-size: 1.8rem;
+            letter-spacing: 3px;
+            color: var(--text-color);
             text-transform: uppercase;
-            letter-spacing: 2px;
-            text-shadow: 0 4px 10px rgba(0, 0, 0, 0.9); 
-            color: #fff;
         }
 
-        .score-num { 
-            color: var(--neon-scored); 
-            font-size: 2rem; 
-            text-shadow: 0 0 15px var(--neon-scored), 0 4px 10px rgba(0,0,0,0.9); 
-        }
+        .score-num { color: var(--neon-alt); }
     </style>
 </head>
 <body>
 
     <div id="ui-top">
-        <div class="hud">
-            SCORE: <span id="scoreDisplay" class="score-num">0</span>
-        </div>
+        <div class="hud">SCORE: <span id="scoreDisplay" class="score-num">0</span></div>
     </div>
 
     <canvas id="gameCanvas" width="540" height="960"></canvas>
@@ -92,571 +78,259 @@
         const maxDragDistance = 220;
         let score = 0;
         
-        let cameraX = 0;
-        let targetCameraX = 0;
-        let cameraY = 0;
-        let targetCameraY = 0;
-        
-        let genX = 0;
-        let genY = 0;
-
-        let bgBuildings = [];
-        let totalBgCycleWidth = 0;
-        const parallaxFactor = 0.2; 
+        let cameraX = 0, targetCameraX = 0;
+        let cameraY = 0, targetCameraY = 0;
+        let genX = 0, genY = 600;
 
         const getCSSVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
         const colors = {
             main: getCSSVar('--neon-main'),
             alt: getCSSVar('--neon-alt'),
-            scored: getCSSVar('--neon-scored'),
             platform: getCSSVar('--platform-body'),
-            bg: getCSSVar('--bg-color')
+            bg: getCSSVar('--bg-color'),
+            grid: getCSSVar('--grid-color')
         };
 
-        const jumpPower = 0.045; 
         const gravity = 0.4;
-        const bounceFactor = 0.4; 
-        const poseStates = { GROUNDED: 0, AIRBORNE: 1, TAKING_OFF: 2 }; 
+        const jumpPower = 0.045;
+        const bounceFactor = 0.3;
 
         let bike = {
-            x: 150, y: 500, vx: 0, vy: 0, radius: 15, 
-            angle: 0, angVel: 0, grounded: false,
-            pose: poseStates.GROUNDED, tuckFactor: 0,
-            dir: 1 
+            x: 100, y: 550, vx: 0, vy: 0, radius: 15, 
+            angle: 0, angVel: 0, grounded: false, dir: 1, tuckFactor: 0
         };
 
         let terrain = [];
         let tutorialTexts = [];
 
-        function updateHUD() {
-            scoreDisplay.innerText = score;
-        }
-
         function generateObstacle() {
-            let gapX = 70 + Math.random() * 80; 
+            let gapX = 80 + Math.random() * 100;
             let startX = genX + gapX;
+            let type = Math.floor(Math.random() * 6);
             
-            let type = Math.floor(Math.random() * 6); 
-            
-            if (genY < 250) type = Math.max(type, 3); 
-            if (genY > 750) type = Math.min(type, 2); 
+            if (genY < 300) type = Math.max(type, 3);
+            if (genY > 700) type = Math.min(type, 2);
 
-            if (type === 0) { 
-                let w = 30 + Math.random() * 80; 
-                let y = genY + (Math.random() * 260 - 140);
-                terrain.push({type: 'rect', x: startX, y: y, w: w, h: 30, landed: false});
-                genX = startX + w;
-                genY = y;
-            } 
-            else if (type === 1) { 
-                let r = 20 + Math.random() * 30; 
-                let y = genY + (Math.random() * 200 - 100);
+            let w = 40 + Math.random() * 80;
+            let y = genY + (Math.random() * 300 - 150);
+
+            if (type === 0) { // Rect
+                terrain.push({type: 'rect', x: startX, y: y, w: w, h: 40, landed: false});
+                genX = startX + w; genY = y;
+            } else if (type === 1) { // Circle
+                let r = 25 + Math.random() * 20;
                 terrain.push({type: 'circle', x: startX + r, y: y, r: r, landed: false});
-                genX = startX + r * 2;
-                genY = y - r; 
-            } 
-            else if (type === 2) { 
-                let currX = startX;
-                let currY = genY; 
-                let stepW = 30 + Math.random() * 20; 
+                genX = startX + r * 2; genY = y - r;
+            } else if (type === 2 || type === 3) { // Steps
+                let stepW = 40, currX = startX, currY = genY;
+                let dirY = type === 2 ? -40 : 40;
                 for(let i=0; i<3; i++) {
                     terrain.push({type: 'rect', x: currX, y: currY, w: stepW, h: 40, landed: false});
-                    currX += stepW + 10; 
-                    currY -= (40 + Math.random() * 20); 
+                    currX += stepW + 20; currY += dirY;
                 }
-                genX = currX;
-                genY = currY + 40;
-            } 
-            else if (type === 3) { 
-                let currX = startX;
-                let currY = genY; 
-                let stepW = 30 + Math.random() * 20;
-                for(let i=0; i<3; i++) {
-                    terrain.push({type: 'rect', x: currX, y: currY, w: stepW, h: 40, landed: false});
-                    currX += stepW + 10;
-                    currY += (40 + Math.random() * 20);
-                }
-                genX = currX;
-                genY = currY - 40;
-            } 
-            else if (type === 4) { 
-                let w = 80 + Math.random() * 50; 
-                let h = 25; let angle = -0.45; 
-                terrain.push({type: 'slope', x: startX, y: genY, w: w, h: h, angle: angle, landed: false});
-                genX = startX + w * Math.cos(angle);
-                genY = genY + w * Math.sin(angle);
-            } 
-            else if (type === 5) { 
-                let w = 80 + Math.random() * 50; 
-                let h = 25; let angle = 0.45; 
-                terrain.push({type: 'slope', x: startX, y: genY, w: w, h: h, angle: angle, landed: false});
-                genX = startX + w * Math.cos(angle);
-                genY = genY + w * Math.sin(angle);
-            }
-        }
-
-        function generateBgBuildings() {
-            bgBuildings = [];
-            totalBgCycleWidth = 0;
-            for (let i = 0; i < 60; i++) {
-                let b = {
-                    w: 50 + Math.random() * 80,
-                    h: 150 + Math.random() * 350,
-                    type: Math.random() > 0.5 ? 'flat' : 'pointed'
-                };
-                bgBuildings.push(b);
-                totalBgCycleWidth += b.w + 10;
+                genX = currX; genY = currY - dirY;
+            } else { // Slope
+                let angle = type === 4 ? -0.4 : 0.4;
+                let sw = 100 + Math.random() * 50;
+                terrain.push({type: 'slope', x: startX, y: genY, w: sw, h: 20, angle: angle, landed: false});
+                genX = startX + sw * Math.cos(angle); genY = genY + sw * Math.sin(angle);
             }
         }
 
         function initGame() {
-            score = 0;
-            terrain = [];
-            updateHUD();
+            score = 0; terrain = []; scoreDisplay.innerText = "0";
+            cameraX = 0; cameraY = 0; genX = 1600; genY = 600;
+            bike = { x: 100, y: 550, vx: 0, vy: 0, radius: 15, angle: 0, angVel: 0, grounded: true, dir: 1, tuckFactor: 0 };
             
-            generateBgBuildings();
+            terrain.push({ type: 'rect', x: -500, y: 600, w: 2100, h: 200, landed: true });
+            terrain.push({ type: 'rect', x: 400, y: 520, w: 150, h: 30, landed: false });
+            terrain.push({ type: 'rect', x: 700, y: 440, w: 120, h: 30, landed: false });
             
-            // Biztonságos padló
-            terrain.push({ type: 'rect', x: -200, y: 600, w: 1800, h: 150, landed: true }); 
-            
-            // Lebegő gyakorló platformok
-            terrain.push({ type: 'rect', x: 400, y: 530, w: 150, h: 30, landed: false }); 
-            terrain.push({ type: 'rect', x: 650, y: 460, w: 120, h: 30, landed: false }); 
-            terrain.push({ type: 'rect', x: 900, y: 390, w: 100, h: 30, landed: false }); 
-            
-            // ÉLES PÁLYA KEZDETE A TUTORIAL VÉGÉNÉL ÉS SZINTJÉN!
-            genX = 1600; 
-            genY = 600; 
-
-            // Szövegek
             tutorialTexts = [
-                { text: "DRAG & RELEASE TO JUMP", x: 250, y: 450 },
-                { text: "TILT WITH DRAG DIRECTION", x: 650, y: 350 },
-                { text: "DON'T HIT YOUR HEAD!", x: 1100, y: 250 },
-                { text: "GOOD LUCK!", x: 1600, y: 450 }
+                { t: "DRAG BACK TO AIM", x: 200, y: 480 },
+                { t: "RELEASE TO JUMP", x: 200, y: 520 },
+                { t: "LAND ON TOP FOR POINTS", x: 700, y: 350 }
             ];
-            
+
             for(let i=0; i<10; i++) generateObstacle();
-            
-            bike.x = 100; bike.y = 550; bike.vx = 0; bike.vy = 0; bike.angle = 0; bike.angVel = 0;
-            bike.pose = poseStates.GROUNDED; bike.grounded = true; bike.tuckFactor = 0;
-            isDragging = false;
-            
-            targetCameraX = bike.x - 120;
-            targetCameraY = bike.y - 650;
-            cameraX = targetCameraX; 
-            cameraY = targetCameraY; 
             gameState = STATE_PLAYING;
         }
 
-        function getPointerPos(clientX, clientY) {
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            return {
-                x: (clientX - rect.left) * scaleX + cameraX,
-                y: (clientY - rect.top) * scaleY + cameraY 
-            };
-        }
-
-        function startDrag(x, y) {
-            if (gameState === STATE_GAMEOVER) { initGame(); return; }
-            if (bike.grounded && gameState === STATE_PLAYING) {
-                isDragging = true;
-                dragStart = { x, y };
-                dragCurrent = { x, y };
-                bike.pose = poseStates.TAKING_OFF; 
-            }
-        }
-
-        function moveDrag(x, y) {
-            if (isDragging && gameState === STATE_PLAYING) {
-                dragCurrent = { x, y };
-            }
-        }
-
-        function endDrag() {
-            if (isDragging && gameState === STATE_PLAYING) {
-                isDragging = false;
-                let aimX = dragStart.x - dragCurrent.x;
-                let aimY = dragStart.y - dragCurrent.y;
-                let aimLen = Math.sqrt(aimX * aimX + aimY * aimY);
-
-                if (aimLen > maxDragDistance) {
-                    aimX = (aimX / aimLen) * maxDragDistance;
-                    aimY = (aimY / aimLen) * maxDragDistance;
-                    aimLen = maxDragDistance; 
-                }
-                
-                if (aimLen > 5) {
-                    bike.vx = aimX * jumpPower;
-                    bike.vy = aimY * jumpPower;
-                    bike.angVel = aimX * -0.0003; 
-                    
-                    if (bike.angVel > 0.025) bike.angVel = 0.025;
-                    if (bike.angVel < -0.025) bike.angVel = -0.025;
-                    
-                    bike.grounded = false;
-                    bike.pose = poseStates.AIRBORNE; 
-                    bike.tuckFactor = 0; 
-                } else {
-                    bike.pose = poseStates.GROUNDED; 
-                }
-            }
-        }
-
-        canvas.addEventListener('mousedown', (e) => { const pos = getPointerPos(e.clientX, e.clientY); startDrag(pos.x, pos.y); });
-        canvas.addEventListener('mousemove', (e) => { const pos = getPointerPos(e.clientX, e.clientY); moveDrag(pos.x, pos.y); });
-        window.addEventListener('mouseup', endDrag);
-
-        canvas.addEventListener('touchstart', (e) => { const pos = getPointerPos(e.touches[0].clientX, e.touches[0].clientY); startDrag(pos.x, pos.y); });
-        canvas.addEventListener('touchmove', (e) => { const pos = getPointerPos(e.touches[0].clientX, e.touches[0].clientY); moveDrag(pos.x, pos.y); });
-        window.addEventListener('touchend', endDrag);
-
-        function checkCollision(px, py, radius, t) {
+        function checkCollision(px, py, r, t) {
             if (t.type === 'circle') {
-                let dx = px - t.x; let dy = py - t.y; let dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist < radius + t.r) return { hit: true, nx: dx/dist, ny: dy/dist, pen: (radius + t.r) - dist };
-            } 
-            else if (t.type === 'slope') {
-                let cx = t.x + t.w/2; let cy = t.y + t.h/2;
-                let dx = px - cx; let dy = py - cy;
+                let dx = px - t.x, dy = py - t.y, dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < r + t.r) return { hit: true, nx: dx/dist, ny: dy/dist, pen: (r + t.r) - dist };
+            } else if (t.type === 'slope') {
+                let cx = t.x + t.w/2, cy = t.y + t.h/2;
+                let dx = px - cx, dy = py - cy;
                 let rdx = dx * Math.cos(-t.angle) - dy * Math.sin(-t.angle);
                 let rdy = dx * Math.sin(-t.angle) + dy * Math.cos(-t.angle);
-                let lwx = cx + rdx; let lwy = cy + rdy;
-
-                let closestX = Math.max(t.x, Math.min(lwx, t.x + t.w));
-                let closestY = Math.max(t.y, Math.min(lwy, t.y + t.h));
-                let cdx = lwx - closestX; let cdy = lwy - closestY;
-                let dist = Math.sqrt(cdx*cdx + cdy*cdy);
-
-                if (dist < radius) {
-                    let nx_l = dist === 0 ? 0 : cdx/dist; let ny_l = dist === 0 ? -1 : cdy/dist;
-                    if (dist === 0) { ny_l = -1; dist = 0.1; }
-                    let nx = nx_l * Math.cos(t.angle) - ny_l * Math.sin(t.angle);
-                    let ny = nx_l * Math.sin(t.angle) + ny_l * Math.cos(t.angle);
-                    return { hit: true, nx: nx, ny: ny, pen: radius - dist };
+                let closestX = Math.max(t.x, Math.min(cx + rdx, t.x + t.w));
+                let closestY = Math.max(t.y, Math.min(cy + rdy, t.y + t.h));
+                let ldx = (cx + rdx) - closestX, ldy = (cy + rdy) - closestY;
+                let dist = Math.sqrt(ldx*ldx + ldy*ldy);
+                if (dist < r) {
+                    let nx = (dist===0?0:ldx/dist) * Math.cos(t.angle) - (dist===0?-1:ldy/dist) * Math.sin(t.angle);
+                    let ny = (dist===0?0:ldx/dist) * Math.sin(t.angle) + (dist===0?-1:ldy/dist) * Math.cos(t.angle);
+                    return { hit: true, nx, ny, pen: r - dist };
                 }
-            } 
-            else { 
-                let closestX = Math.max(t.x, Math.min(px, t.x + t.w));
-                let closestY = Math.max(t.y, Math.min(py, t.y + t.h));
-                let dx = px - closestX; let dy = py - closestY;
-                let dist = Math.sqrt(dx*dx + dy*dy);
-
-                if (dist < radius) {
-                    let nx = dist === 0 ? 0 : dx/dist; let ny = dist === 0 ? -1 : dy/dist;
-                    if (dist === 0) { ny = -1; dist = 0.1; }
-                    return { hit: true, nx: nx, ny: ny, pen: radius - dist };
-                }
+            } else {
+                let cX = Math.max(t.x, Math.min(px, t.x + t.w));
+                let cY = Math.max(t.y, Math.min(py, t.y + t.h));
+                let dx = px - cX, dy = py - cY, dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < r) return { hit: true, nx: dist===0?0:dx/dist, ny: dist===0?-1:dy/dist, pen: r - dist };
             }
             return { hit: false };
         }
 
-        function updatePhysics() {
-            targetCameraX = bike.x - 120; 
-            targetCameraY = bike.y - 650; 
-            cameraX += (targetCameraX - cameraX) * 0.08;
-            cameraY += (targetCameraY - cameraY) * 0.08;
-
+        function update() {
             if (gameState !== STATE_PLAYING) return;
 
-            if (cameraX + canvas.width > genX - 500) {
-                generateObstacle();
-                terrain = terrain.filter(t => t.x > cameraX - 1000);
-            }
-
             bike.vy += gravity;
-
-            if (!bike.grounded) {
-                bike.tuckFactor = Math.min(1, bike.tuckFactor + 0.05);
-            }
-
             if (isDragging && bike.grounded) {
-                const pullX = dragCurrent.x - dragStart.x;
-                let targetAngle = (pullX / maxDragDistance) * 0.65; 
-                targetAngle = Math.max(-0.65, Math.min(0.65, targetAngle));
-                bike.angle += (targetAngle - bike.angle) * 0.15;
+                let tilt = Math.max(-0.6, Math.min(0.6, (dragCurrent.x - dragStart.x) / maxDragDistance));
+                bike.angle += (tilt - bike.angle) * 0.2;
             }
 
-            bike.x += bike.vx;
-            bike.y += bike.vy;
-            bike.angle += bike.angVel;
-            while (bike.angle > Math.PI) bike.angle -= Math.PI * 2;
-            while (bike.angle < -Math.PI) bike.angle += Math.PI * 2;
-
-            let headRx = 10 * bike.dir; let headRy = -55;
-            let headWx = bike.x + Math.cos(bike.angle)*headRx - Math.sin(bike.angle)*headRy;
-            let headWy = bike.y + Math.sin(bike.angle)*headRx + Math.cos(bike.angle)*headRy;
+            bike.x += bike.vx; bike.y += bike.vy; bike.angle += bike.angVel;
             
-            for (let t of terrain) {
-                let hitResult = checkCollision(headWx, headWy, 12, t);
-                if (hitResult.hit) { gameState = STATE_GAMEOVER; return; }
-            }
+            if (bike.x > genX - 1000) generateObstacle();
 
-            let hitGroundThisFrame = false;
-
-            const collisionPoints = [
-                { rx: -25 * bike.dir, ry: 10, radius: 12 }, 
-                { rx: 30 * bike.dir,  ry: 10, radius: 12 }, 
-                { rx: 0,              ry: 0,  radius: 10 }  
-            ];
-
-            for (let p of collisionPoints) {
-                let wx = bike.x + Math.cos(bike.angle)*p.rx - Math.sin(bike.angle)*p.ry;
-                let wy = bike.y + Math.sin(bike.angle)*p.rx + Math.cos(bike.angle)*p.ry;
-
-                let leftBound = cameraX - 50;
-                if (wx - p.radius < leftBound) { 
-                    bike.x += Math.abs(wx - p.radius - leftBound); 
-                    bike.vx = Math.abs(bike.vx) * bounceFactor; 
-                    bike.angVel *= -0.3; wx = leftBound + p.radius; 
-                }
-
-                for (let t of terrain) {
-                    let c = checkCollision(wx, wy, p.radius, t);
+            let groundedThisFrame = false;
+            const pts = [{dx: -25, dy: 10}, {dx: 30, dy: 10}, {dx: 0, dy: 0}];
+            
+            pts.forEach(p => {
+                let wx = bike.x + Math.cos(bike.angle)*p.dx - Math.sin(bike.angle)*p.dy;
+                let wy = bike.y + Math.sin(bike.angle)*p.dx + Math.cos(bike.angle)*p.dy;
+                
+                terrain.forEach(t => {
+                    let c = checkCollision(wx, wy, 12, t);
                     if (c.hit) {
-                        bike.x += c.nx * c.pen;
-                        bike.y += c.ny * c.pen;
-
-                        if (!t.landed && c.ny < -0.5) { 
-                            t.landed = true;
-                            score++;
-                            updateHUD();
-                        }
-
-                        if (Math.abs(c.ny) > Math.abs(c.nx)) {
-                            if (c.ny < 0) { 
-                                bike.vy = 0; bike.vx = 0; bike.angVel = 0; 
-                                hitGroundThisFrame = true; bike.pose = poseStates.GROUNDED; 
-                            } else { bike.vy = Math.abs(bike.vy) * 0.5; }
-                        } else { 
-                            bike.vx = -bike.vx * bounceFactor; bike.angVel *= -0.3; 
+                        bike.x += c.nx * c.pen; bike.y += c.ny * c.pen;
+                        if (c.ny < -0.5) {
+                            bike.vy = 0; bike.vx = 0; bike.angVel = 0;
+                            groundedThisFrame = true;
+                            if (!t.landed) { t.landed = true; score++; scoreDisplay.innerText = score; }
+                        } else {
+                            bike.vx *= -bounceFactor; bike.vy *= -bounceFactor;
                         }
                     }
-                }
-            }
+                });
+            });
 
-            bike.grounded = hitGroundThisFrame;
+            // Head death
+            let hx = bike.x + Math.cos(bike.angle)*10 - Math.sin(bike.angle)*-50;
+            let hy = bike.y + Math.sin(bike.angle)*10 + Math.cos(bike.angle)*-50;
+            terrain.forEach(t => { if(checkCollision(hx, hy, 10, t).hit) gameState = STATE_GAMEOVER; });
 
-            if (bike.grounded && !isDragging) {
-                if (bike.angle * bike.dir > 0) { bike.angle += (-0.1 * bike.dir - bike.angle) * 0.1; }
-                bike.tuckFactor = Math.max(0, bike.tuckFactor - 0.1); 
-            }
-            
-            if (bike.y > cameraY + canvas.height + 100) gameState = STATE_GAMEOVER;
+            bike.grounded = groundedThisFrame;
+            if (bike.y > cameraY + 1200) gameState = STATE_GAMEOVER;
+
+            targetCameraX = bike.x - 150; targetCameraY = bike.y - 600;
+            cameraX += (targetCameraX - cameraX) * 0.1; cameraY += (targetCameraY - cameraY) * 0.1;
         }
 
         function draw() {
-            // 1. ÉGBOLT (Fekete/Szürke Minimalista)
-            ctx.fillStyle = colors.bg;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = colors.bg; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Grid
+            ctx.strokeStyle = colors.grid; ctx.lineWidth = 1;
+            let gridSize = 100;
+            for(let x = -cameraX % gridSize; x < canvas.width; x += gridSize) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+            for(let y = -cameraY % gridSize; y < canvas.height; y += gridSize) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
 
-            // 2. VÁROS (Parallaxis)
-            ctx.save();
-            const bgOffset = (cameraX * parallaxFactor) % totalBgCycleWidth;
-            ctx.translate(-bgOffset, 0);
+            ctx.save(); ctx.translate(-cameraX, -cameraY);
 
-            // Sötétszürke semi-átlátszó sziluett
-            ctx.fillStyle = "rgba(40, 40, 45, 0.6)"; 
+            // Tutorial
+            ctx.fillStyle = "rgba(255,255,255,0.3)"; ctx.font = "20px monospace";
+            tutorialTexts.forEach(t => ctx.fillText(t.t, t.x, t.y));
 
-            let currentX = 0;
-            // Loop pool twice to cover visible screen with scrolling
-            for (let b of bgBuildings) {
-                let bY = canvas.height - b.h - 50;
+            // Terrain
+            terrain.forEach(t => {
+                ctx.fillStyle = colors.platform;
+                let stroke = t.landed ? colors.alt : colors.main;
+                ctx.strokeStyle = stroke; ctx.lineWidth = 3;
                 
-                if (b.type === 'flat') {
-                    ctx.fillRect(currentX, bY, b.w, b.h);
-                } else {
-                    ctx.beginPath();
-                    ctx.moveTo(currentX, bY + b.h);
-                    ctx.lineTo(currentX, bY + 30);
-                    ctx.lineTo(currentX + b.w / 2, bY);
-                    ctx.lineTo(currentX + b.w, bY + 30);
-                    ctx.lineTo(currentX + b.w, bY + b.h);
-                    ctx.fill();
-                }
-
-                // Halvány Neon türkiz körvonal
-                ctx.strokeStyle = "rgba(0, 243, 255, 0.15)"; 
-                ctx.lineWidth = 1;
-                if (b.type === 'flat') {
-                    ctx.strokeRect(currentX, bY, b.w, b.h);
-                } else {
-                    ctx.beginPath();
-                    ctx.moveTo(currentX, bY + b.h);
-                    ctx.lineTo(currentX, bY + 30);
-                    ctx.lineTo(currentX + b.w / 2, bY);
-                    ctx.lineTo(currentX + b.w, bY + 30);
-                    ctx.lineTo(currentX + b.w, bY + b.h);
-                    ctx.stroke();
-                }
-                currentX += b.w + 10;
-            }
-            ctx.restore();
-
-            // 3. JÁTÉKTÉR KAMERA ELTOLÁS ---
-            ctx.save();
-            ctx.translate(-cameraX, -cameraY);
-
-            // Tutorial szövegek (Világostürkiz Neon)
-            ctx.fillStyle = "rgba(0, 243, 255, 0.6)"; 
-            ctx.font = "bold 24px sans-serif";
-            ctx.textAlign = "center";
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = colors.main;
-            for (let txt of tutorialTexts) {
-                ctx.fillText(txt.text, txt.x, txt.y);
-            }
-            ctx.shadowBlur = 0;
-
-            // 4. PLATFORMOK RAJZOLÁSA
-            ctx.lineJoin = "miter"; ctx.lineCap = "butt";
-            for (let t of terrain) {
-                ctx.fillStyle = colors.platform; // Sötétszürke body
-                let edgeColor = t.landed ? colors.scored : colors.main; // Landolt sárga, egyéb türkiz
-
-                ctx.shadowBlur = t.landed ? 15 : 8;
-                ctx.shadowColor = edgeColor;
-                ctx.strokeStyle = edgeColor;
-                ctx.lineWidth = t.landed ? 4 : 2; 
-
                 if (t.type === 'rect') {
                     ctx.fillRect(t.x, t.y, t.w, t.h);
-                    ctx.beginPath(); ctx.moveTo(t.x, t.y+1); ctx.lineTo(t.x+t.w, t.y+1);
-                    ctx.stroke();
-                } 
-                else if (t.type === 'circle') {
-                    ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.stroke();
-                } 
-                else if (t.type === 'slope') {
-                    ctx.save();
-                    ctx.translate(t.x + t.w/2, t.y + t.h/2);
-                    ctx.rotate(t.angle);
-                    ctx.translate(-(t.x + t.w/2), -(t.y + t.h/2));
-                    ctx.fillRect(t.x, t.y, t.w, t.h);
-                    ctx.beginPath(); ctx.moveTo(t.x, t.y+1); ctx.lineTo(t.x+t.w, t.y+1);
-                    ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(t.x, t.y); ctx.lineTo(t.x + t.w, t.y); ctx.stroke();
+                } else if (t.type === 'circle') {
+                    ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                } else if (t.type === 'slope') {
+                    ctx.save(); ctx.translate(t.x + t.w/2, t.y + t.h/2); ctx.rotate(t.angle);
+                    ctx.fillRect(-t.w/2, -t.h/2, t.w, t.h);
+                    ctx.beginPath(); ctx.moveTo(-t.w/2, -t.h/2); ctx.lineTo(t.w/2, -t.h/2); ctx.stroke();
                     ctx.restore();
                 }
-                ctx.shadowBlur = 0;
+            });
+
+            // Input
+            if (isDragging && bike.grounded) {
+                let dx = dragStart.x - dragCurrent.x, dy = dragStart.y - dragCurrent.y;
+                ctx.setLineDash([5, 5]); ctx.strokeStyle = colors.main;
+                ctx.beginPath(); ctx.moveTo(bike.x, bike.y); ctx.lineTo(bike.x + dx, bike.y + dy); ctx.stroke();
+                ctx.setLineDash([]);
             }
 
-            // 5. CÉLZÓ VONAL ÉS CSÚZLI
-            if (isDragging && gameState === STATE_PLAYING) {
-                let aimX = dragStart.x - dragCurrent.x; let aimY = dragStart.y - dragCurrent.y;
-                let dragX = dragCurrent.x - dragStart.x; let dragY = dragCurrent.y - dragStart.y;
-                let aimLen = Math.sqrt(aimX * aimX + aimY * aimY);
+            // Bike (Simplified Clean)
+            ctx.save(); ctx.translate(bike.x, bike.y); ctx.rotate(bike.angle);
+            ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.arc(-25, 10, 12, 0, 7); ctx.stroke(); // Back wheel
+            ctx.beginPath(); ctx.arc(30, 10, 12, 0, 7); ctx.stroke();  // Front wheel
+            ctx.beginPath(); ctx.moveTo(-25, 10); ctx.lineTo(0, 10); ctx.lineTo(20, -15); ctx.lineTo(30, 10); // Frame
+            ctx.lineTo(20, -15); ctx.lineTo(-10, 0); ctx.lineTo(-25, 10); ctx.stroke();
+            // Rider
+            ctx.strokeStyle = colors.main; ctx.beginPath();
+            ctx.moveTo(-10, 0); ctx.lineTo(5, -40); ctx.lineTo(20, -15); // Body & Arms
+            ctx.stroke(); ctx.beginPath(); ctx.arc(8, -50, 7, 0, 7); ctx.fillStyle = colors.main; ctx.fill();
+            ctx.restore();
 
-                if (aimLen > maxDragDistance) {
-                    aimX = (aimX / aimLen) * maxDragDistance; aimY = (aimY / aimLen) * maxDragDistance;
-                    dragX = (dragX / aimLen) * maxDragDistance; dragY = (dragY / aimLen) * maxDragDistance;
-                }
+            ctx.restore();
 
-                // Célzó pöttyös vonal (Türkiz)
-                ctx.beginPath(); ctx.moveTo(bike.x, bike.y); ctx.lineTo(bike.x + aimX, bike.y + aimY);
-                ctx.strokeStyle = "rgba(0, 243, 255, 0.5)"; ctx.lineWidth = 2; ctx.setLineDash([8, 6]); ctx.stroke();
-                
-                // Csúzli húzó vonal (Sárga, mert alert/akció)
-                ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(bike.x, bike.y); ctx.lineTo(bike.x + dragX, bike.y + dragY);
-                ctx.strokeStyle = "rgba(255, 215, 0, 0.8)"; ctx.lineWidth = 3; ctx.stroke(); 
-                if (aimLen >= maxDragDistance) {
-                    ctx.beginPath(); ctx.fillStyle = colors.alt; ctx.arc(bike.x + dragX, bike.y + dragY, 4, 0, Math.PI * 2); ctx.fill();
-                }
-            }
-
-            // 6. BRINGA ÉS RIDER RAJZOLÁS
-            ctx.save();
-            ctx.translate(bike.x, bike.y); ctx.rotate(bike.angle); ctx.scale(bike.dir, 1); 
-            ctx.lineCap = "square"; ctx.lineJoin = "miter";
-
-            // Kerekek (Türkiz edge)
-            ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.lineWidth = 4;
-            ctx.beginPath(); ctx.arc(-25, 10, 12, 0, Math.PI * 2); ctx.stroke();
-            ctx.beginPath(); ctx.arc(-25, 10, 8, 0, Math.PI * 2); ctx.strokeStyle = colors.main; ctx.lineWidth = 1; ctx.stroke();
-            ctx.beginPath(); ctx.arc(30, 10, 12, 0, Math.PI * 2); ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.lineWidth = 4; ctx.stroke();
-            ctx.beginPath(); ctx.arc(30, 10, 8, 0, Math.PI * 2); ctx.strokeStyle = colors.main; ctx.lineWidth = 1; ctx.stroke();
-
-            // Váz és Kormány (Közép szürke)
-            ctx.strokeStyle = "rgba(100,100,105,0.9)"; ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.moveTo(-25, 10); ctx.lineTo(0, 10); ctx.lineTo(20, -15); ctx.lineTo(30, 10); 
-            ctx.moveTo(20, -15); ctx.lineTo(-10, 0); ctx.lineTo(-25, 10); ctx.moveTo(-10, 0); ctx.lineTo(0, 10); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(20, -15); ctx.lineTo(18, -20); ctx.lineTo(22, -22); ctx.stroke();
-
-            // RIDER (Türkiz/Sárga Neon)
-            ctx.beginPath();
-            // Ha takin off vagy airborne, erősebb Türkiz neon
-            ctx.strokeStyle = gameState !== STATE_PLAYING ? colors.alt : colors.main; 
-            ctx.lineWidth = 4; ctx.shadowBlur = 10; ctx.shadowColor = ctx.strokeStyle;
-            
-            const hands = { x: 20, y: -22 }; const pedals = { x: 0, y: 10 };   
-            let butt = { x: -12, y: -22 }; let shoulder = { x: 5, y: -45 }; let head = { x: 10, y: -55 };     
-
-            if (isDragging && gameState === STATE_PLAYING) {
-                const pullX = dragCurrent.x - dragStart.x; const pullY = dragCurrent.y - dragStart.y;
-                const localPullX = pullX * bike.dir; let pullLen = Math.sqrt(localPullX*localPullX + pullY*pullY);
-                if (pullLen > 0) {
-                    let moveDist = Math.min(pullLen, maxDragDistance);
-                    butt.x += (localPullX/pullLen)*(moveDist*0.12); butt.y += (pullY/pullLen)*(moveDist*0.12);
-                    shoulder.x += (localPullX/pullLen)*(moveDist*0.15); shoulder.y += (pullY/pullLen)*(moveDist*0.15);
-                    head.x += (localPullX/pullLen)*(moveDist*0.15); head.y += (pullY/pullLen)*(moveDist*0.15);
-                }
-            } else if (!bike.grounded && bike.pose === poseStates.AIRBORNE) {
-                butt.x += 10 * bike.tuckFactor; butt.y += 8 * bike.tuckFactor;
-                shoulder.x += 12 * bike.tuckFactor; shoulder.y += 10 * bike.tuckFactor;
-                head.x += 12 * bike.tuckFactor; head.y += 10 * bike.tuckFactor;
-            }
-
-            // Test és végtagok rajzolása
-            ctx.moveTo(butt.x, butt.y); ctx.lineTo(shoulder.x, shoulder.y); 
-            let armMx = (shoulder.x + hands.x) / 2 - 5; let armMy = (shoulder.y + hands.y) / 2 - 8;
-            ctx.moveTo(shoulder.x, shoulder.y); ctx.lineTo(armMx, armMy); ctx.lineTo(hands.x, hands.y);
-            let legMx = (butt.x + pedals.x) / 2 + 12; let legMy = (butt.y + pedals.y) / 2 - 4;
-            ctx.moveTo(butt.x, butt.y); ctx.lineTo(legMx, legMy); ctx.lineTo(pedals.x, pedals.y);
-            ctx.stroke();
-
-            // Fej (Türkiz Neon)
-            ctx.beginPath(); ctx.arc(head.x, head.y, 8, 0, Math.PI * 2); ctx.fillStyle = ctx.strokeStyle; ctx.fill();
-            ctx.shadowBlur = 0; ctx.restore(); ctx.restore(); 
-
-            // --- GAME OVER KÉPERNYŐ OVERLAY (Minimalista Stark) ---
             if (gameState === STATE_GAMEOVER) {
-                // Stark Stark sötét overlay
-                ctx.fillStyle = "rgba(10, 10, 12, 0.95)"; 
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                // CRASHED (Nagy Sárga Neon, masszív shadow-val)
-                ctx.shadowBlur = 30;
-                ctx.shadowColor = colors.alt;
-                ctx.fillStyle = colors.alt; 
-                ctx.font = "900 55px sans-serif"; 
-                ctx.textAlign = "center";
-                ctx.fillText("CRASHED", canvas.width / 2, canvas.height / 2 - 40);
-                
-                // SCORE (Pont Sárga Neon)
-                ctx.shadowColor = colors.scored;
-                ctx.font = "900 30px sans-serif"; 
-                ctx.fillStyle = colors.scored; 
-                ctx.fillText(`SCORE: ${score}`, canvas.width / 2, canvas.height / 2 + 10);
-                
-                // RESTART INSTRUCTION (Világos szürke text)
-                ctx.shadowBlur = 0;
-                ctx.fillStyle = "#fff"; 
-                ctx.font = "16px sans-serif"; 
-                ctx.fillText("Click anywhere to restart!", canvas.width / 2, canvas.height / 2 + 70);
+                ctx.fillStyle = "rgba(0,0,0,0.85)"; ctx.fillRect(0,0,canvas.width,canvas.height);
+                ctx.fillStyle = colors.alt; ctx.font = "bold 50px sans-serif"; ctx.textAlign = "center";
+                ctx.fillText("CRASHED", canvas.width/2, canvas.height/2);
+                ctx.font = "20px sans-serif"; ctx.fillStyle = "#fff";
+                ctx.fillText("TAP TO RESTART", canvas.width/2, canvas.height/2 + 50);
             }
         }
 
-        function gameLoop() {
-            updatePhysics();
-            draw();
-            requestAnimationFrame(gameLoop);
-        }
+        function loop() { update(); draw(); requestAnimationFrame(loop); }
 
-        initGame();
-        gameLoop();
+        canvas.addEventListener('mousedown', e => { 
+            const p = {x: e.clientX, y: e.clientY};
+            if(gameState === STATE_GAMEOVER) initGame();
+            else if(bike.grounded) { isDragging = true; dragStart = p; dragCurrent = p; }
+        });
+        window.addEventListener('mousemove', e => { if(isDragging) dragCurrent = {x: e.clientX, y: e.clientY}; });
+        window.addEventListener('mouseup', () => {
+            if(isDragging) {
+                let dx = dragStart.x - dragCurrent.x, dy = dragStart.y - dragCurrent.y;
+                bike.vx = dx * jumpPower; bike.vy = dy * jumpPower;
+                bike.angVel = dx * -0.0003; bike.grounded = false; isDragging = false;
+            }
+        });
+
+        canvas.addEventListener('touchstart', e => {
+            const p = {x: e.touches[0].clientX, y: e.touches[0].clientY};
+            if(gameState === STATE_GAMEOVER) initGame();
+            else if(bike.grounded) { isDragging = true; dragStart = p; dragCurrent = p; }
+        });
+        canvas.addEventListener('touchmove', e => { if(isDragging) dragCurrent = {x: e.touches[0].clientX, y: e.touches[0].clientY}; });
+        canvas.addEventListener('touchend', () => {
+            if(isDragging) {
+                let dx = dragStart.x - dragCurrent.x, dy = dragStart.y - dragCurrent.y;
+                bike.vx = dx * jumpPower; bike.vy = dy * jumpPower;
+                bike.angVel = dx * -0.0003; bike.grounded = false; isDragging = false;
+            }
+        });
+
+        initGame(); loop();
     </script>
 </body>
 </html>
