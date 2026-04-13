@@ -447,10 +447,12 @@
             let hitGroundThisFrame = false;
             let rearContact = null;
             let frontContact = null;
+            let pedalContact = null;
 
             const collisionPoints = [
                 { name: 'rear',  rx: -25 * bike.dir, ry: 10, radius: 12 },
                 { name: 'front', rx: 30 * bike.dir,  ry: 10, radius: 12 },
+                { name: 'pedal', rx: 0,              ry: 10, radius: 9 },
                 { name: 'body',  rx: 0,              ry: 0,  radius: 10 }
             ];
 
@@ -471,7 +473,7 @@
                         bike.x += c.nx * c.pen;
                         bike.y += c.ny * c.pen;
 
-                        if (!t.landed && c.ny < -0.5) {
+                        if (!t.landed && c.ny < -0.5 && (p.name === 'rear' || p.name === 'front' || p.name === 'pedal')) {
                             t.landed = true;
                             score++;
                             updateHUD();
@@ -485,9 +487,12 @@
                                 if (p.name === 'front') {
                                     frontContact = { wx, wy, nx: c.nx, ny: c.ny };
                                 }
+                                if (p.name === 'pedal') {
+                                    pedalContact = { wx, wy, nx: c.nx, ny: c.ny };
+                                }
 
                                 bike.vy = 0;
-                                bike.vx = 0;
+                                if (p.name !== 'body') bike.vx *= 0.85;
                                 bike.angVel = 0;
                                 bike.targetAirAngle = 0;
                                 bike.airRotateStrength = 0.12;
@@ -516,6 +521,9 @@
                 } else if (frontContact) {
                     const surfaceAngle = Math.atan2(frontContact.ny, frontContact.nx) + Math.PI / 2;
                     bike.groundAngle = surfaceAngle - ONE_WHEEL_DROP;
+                } else if (pedalContact) {
+                    const surfaceAngle = Math.atan2(pedalContact.ny, pedalContact.nx) + Math.PI / 2;
+                    bike.groundAngle = surfaceAngle - 0.05;
                 }
 
                 bike.groundAngle = clamp(bike.groundAngle, -GROUND_ANGLE_LIMIT, GROUND_ANGLE_LIMIT);
@@ -525,8 +533,7 @@
 
             if (bike.grounded && !isDragging) {
                 bike.landingRecover = Math.max(0, bike.landingRecover - 0.08);
-
-                const droop = -0.08 * bike.landingRecover;
+                const droop = pedalContact && !rearContact && !frontContact ? -0.03 * bike.landingRecover : -0.08 * bike.landingRecover;
                 const settleTarget = bike.groundAngle + droop;
 
                 bike.angle += (settleTarget - bike.angle) * 0.16;
