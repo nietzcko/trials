@@ -101,6 +101,11 @@
         let genX = 0;
         let genY = 0;
 
+        // --- ÚJ PARALLAX HÁTTÉR ÁLLAPOT ---
+        let bgBuildings = [];
+        let totalBgCycleWidth = 0;
+        const parallaxFactor = 0.2; // A város 20%-os sebességgel mozog
+
         const getCSSVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
         const colors = {
             main: getCSSVar('--neon-main'),
@@ -192,27 +197,37 @@
             }
         }
 
+        // --- ÚJ VÁROS GENERÁLÁS ---
+        function generateBgBuildings() {
+            bgBuildings = [];
+            totalBgCycleWidth = 0;
+            for (let i = 0; i < 60; i++) {
+                let b = {
+                    w: 40 + Math.random() * 100,
+                    h: 150 + Math.random() * 450
+                };
+                bgBuildings.push(b);
+                totalBgCycleWidth += b.w + 5;
+            }
+        }
+
         function initGame() {
             score = 0;
             terrain = [];
             updateHUD();
             
-            // --- TUTORIAL ZÓNA ---
+            // Háttér város generálása
+            generateBgBuildings();
+            
             genX = 0; genY = 600;
-            
-            // Nagy, hosszú, biztonságos alsó padló
             terrain.push({ type: 'rect', x: -200, y: 600, w: 1800, h: 150, landed: true }); 
-            
-            // Gyakorló platformok a padló felett
             terrain.push({ type: 'rect', x: 500, y: 500, w: 150, h: 30, landed: false }); 
             terrain.push({ type: 'rect', x: 800, y: 400, w: 100, h: 30, landed: false }); 
             terrain.push({ type: 'rect', x: 1100, y: 300, w: 80, h: 30, landed: false }); 
             
-            // A pálya igazi generálása az 1600-as X koordinátától indul, kb a fenti magasságban
             genX = 1600; 
             genY = 300;
 
-            // Tutorial szövegek a térben (X, Y koordinátákkal)
             tutorialTexts = [
                 { text: "DRAG & RELEASE TO JUMP", x: 250, y: 450 },
                 { text: "TILT WITH DRAG DIRECTION", x: 650, y: 350 },
@@ -444,18 +459,36 @@
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+            // --- ÚJ PARALLAX VÁROS RAJZOLÁSA (Kamera eltolás nélkül) ---
+            ctx.save();
+            // Kiszámítjuk a háttér eltolását (Modulo alapján, hogy seamlessen loopoljon)
+            const bgOffset = (cameraX * parallaxFactor) % totalBgCycleWidth;
+            ctx.translate(-bgOffset, 0);
+
+            // Halvány, semi-átlátszó sötét sziluett
+            ctx.fillStyle = "rgba(31, 40, 51, 0.4)"; 
+
+            let currentX = 0;
+            // Loop pool twice to cover visible screen with scrolling
+            for (let i = 0; i < 2; i++) {
+                for (let b of bgBuildings) {
+                    ctx.fillRect(currentX, canvas.height - b.h - 50, b.w, b.h); // Anchored near bottom
+                    currentX += b.w + 5;
+                }
+            }
+            ctx.restore();
+
+            // Pálya és Bringa kamera eltolás
             ctx.save();
             ctx.translate(-cameraX, -cameraY);
 
-            // --- TUTORIAL SZÖVEGEK RAJZOLÁSA ---
-            ctx.fillStyle = "rgba(102, 252, 241, 0.4)"; // Neon kék, áttetsző
+            ctx.fillStyle = "rgba(102, 252, 241, 0.4)"; // Neon cyan, translucent
             ctx.font = "bold 24px sans-serif";
             ctx.textAlign = "center";
             for (let txt of tutorialTexts) {
                 ctx.fillText(txt.text, txt.x, txt.y);
             }
 
-            // Pálya rajzolása
             ctx.lineJoin = "miter"; ctx.lineCap = "butt";
             for (let t of terrain) {
                 ctx.fillStyle = colors.platform;
@@ -513,20 +546,9 @@
             ctx.beginPath(); ctx.arc(30, 10, 12, 0, Math.PI * 2); ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.lineWidth = 4; ctx.stroke();
             ctx.beginPath(); ctx.arc(30, 10, 8, 0, Math.PI * 2); ctx.strokeStyle = colors.main; ctx.lineWidth = 1; ctx.stroke();
 
-            // Javított villa (30 pixel az első kerék közepe)
             ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 2;
-            ctx.beginPath(); 
-            ctx.moveTo(-25, 10); 
-            ctx.lineTo(0, 10);   
-            ctx.lineTo(20, -15); 
-            ctx.lineTo(30, 10);  
-            ctx.moveTo(20, -15); 
-            ctx.lineTo(-10, 0);  
-            ctx.lineTo(-25, 10); 
-            ctx.moveTo(-10, 0);  
-            ctx.lineTo(0, 10);   
-            ctx.stroke();
-
+            ctx.beginPath(); ctx.moveTo(-25, 10); ctx.lineTo(0, 10); ctx.lineTo(20, -15); ctx.lineTo(30, 10); 
+            ctx.moveTo(20, -15); ctx.lineTo(-10, 0); ctx.lineTo(-25, 10); ctx.moveTo(-10, 0); ctx.lineTo(0, 10); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(20, -15); ctx.lineTo(18, -20); ctx.lineTo(22, -22); ctx.stroke();
 
             ctx.beginPath();
