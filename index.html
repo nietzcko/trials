@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Trial - Endless Survival</title>
+    <title>Neon Trial - Hardcore Survival</title>
     <style>
         :root {
             --bg-color: #0b0c10;
@@ -122,7 +122,6 @@
         
         let bgPulse = 0; 
 
-        // Generátor státusz
         let genX = 0;
         let genY = 0;
 
@@ -153,40 +152,37 @@
             scoreDisplay.innerText = score;
         }
 
-        // --- ÚJ GENERÁTOR KÜLÖNBÖZŐ ALAKZATOKKAL ---
+        // --- HARDCORE GENERÁTOR (Kisebb platformok) ---
         function generateObstacle() {
-            // Mennyi helyet hagyjunk az előző után
-            let gapX = 80 + Math.random() * 60; 
+            let gapX = 70 + Math.random() * 80; 
             let startX = genX + gapX;
             
-            // Randomizált típus
             let type = Math.floor(Math.random() * 6); 
-            // 0: Sima | 1: Kör | 2: Lépcső Fel | 3: Lépcső Le | 4: Lejtő Fel | 5: Lejtő Le
             
-            // Biztonsági korlátok: ha túl magasan vagy mélyen vagyunk, kényszerítjük az irányt
-            if (genY < 300) type = Math.max(type, 3); // Lefelé vigyen
-            if (genY > 700) type = Math.min(type, 2); // Felfelé vigyen
+            if (genY < 300) type = Math.max(type, 3); 
+            if (genY > 700) type = Math.min(type, 2); 
 
-            if (type === 0) { // Sima vízszintes
-                let w = 80 + Math.random() * 100;
+            if (type === 0) { // Sima vízszintes (Akár 30px kicsi is lehet!)
+                let w = 30 + Math.random() * 90; 
                 let y = genY + (Math.random() * 80 - 40);
                 terrain.push({type: 'rect', x: startX, y: y, w: w, h: 30, landed: false});
                 genX = startX + w;
                 genY = y;
             } 
-            else if (type === 1) { // Kör (Bolygo)
-                let r = 40 + Math.random() * 40;
+            else if (type === 1) { // Kör 
+                let r = 20 + Math.random() * 35; // Sokkal kisebb görbületek
                 let y = genY + (Math.random() * 60 - 30);
                 terrain.push({type: 'circle', x: startX + r, y: y, r: r, landed: false});
                 genX = startX + r * 2;
-                genY = y - r; // A teteje az érkezési magasság
+                genY = y - r; 
             } 
             else if (type === 2) { // Lépcső Fel
                 let currX = startX;
                 let currY = genY + 20; 
+                let stepW = 30 + Math.random() * 25; // Keskenyebb fokok
                 for(let i=0; i<3; i++) {
-                    terrain.push({type: 'rect', x: currX, y: currY, w: 50, h: 40, landed: false});
-                    currX += 50;
+                    terrain.push({type: 'rect', x: currX, y: currY, w: stepW, h: 40, landed: false});
+                    currX += stepW;
                     currY -= 35;
                 }
                 genX = currX;
@@ -195,22 +191,25 @@
             else if (type === 3) { // Lépcső Le
                 let currX = startX;
                 let currY = genY - 20; 
+                let stepW = 30 + Math.random() * 25;
                 for(let i=0; i<3; i++) {
-                    terrain.push({type: 'rect', x: currX, y: currY, w: 50, h: 40, landed: false});
-                    currX += 50;
+                    terrain.push({type: 'rect', x: currX, y: currY, w: stepW, h: 40, landed: false});
+                    currX += stepW;
                     currY += 35;
                 }
                 genX = currX;
                 genY = currY - 35;
             } 
             else if (type === 4) { // Döntött Rampa (Felfelé)
-                let w = 150; let h = 25; let angle = -0.35; // kb 20 fok
+                let w = 80 + Math.random() * 60; // Rövidebb ugratók
+                let h = 25; let angle = -0.35; 
                 terrain.push({type: 'slope', x: startX, y: genY, w: w, h: h, angle: angle, landed: false});
                 genX = startX + w * Math.cos(angle);
                 genY = genY + w * Math.sin(angle);
             } 
             else if (type === 5) { // Döntött Rampa (Lefelé)
-                let w = 150; let h = 25; let angle = 0.35; 
+                let w = 80 + Math.random() * 60; 
+                let h = 25; let angle = 0.35; 
                 terrain.push({type: 'slope', x: startX, y: genY, w: w, h: h, angle: angle, landed: false});
                 genX = startX + w * Math.cos(angle);
                 genY = genY + w * Math.sin(angle);
@@ -225,12 +224,10 @@
             terrain = [];
             updateHUD();
             
-            // Kezdő platform
             genX = 0; genY = 600;
             terrain.push({ type: 'rect', x: 0, y: 600, w: 300, h: 50, landed: true }); 
             genX = 300;
             
-            // Előre generálunk 10 akadályt
             for(let i=0; i<10; i++) generateObstacle();
             
             bike.x = 150; bike.y = 550; bike.vx = 0; bike.vy = 0; bike.angle = 0; bike.angVel = 0;
@@ -310,18 +307,12 @@
         canvas.addEventListener('touchmove', (e) => { const pos = getPointerPos(e.touches[0].clientX, e.touches[0].clientY); moveDrag(pos.x, pos.y); });
         window.addEventListener('touchend', endDrag);
 
-        // --- UNIVERZÁLIS ÜTKÖZÉS FIZIKA ---
         function checkCollision(px, py, radius, t) {
             if (t.type === 'circle') {
-                let dx = px - t.x;
-                let dy = py - t.y;
-                let dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist < radius + t.r) {
-                    return { hit: true, nx: dx/dist, ny: dy/dist, pen: (radius + t.r) - dist };
-                }
+                let dx = px - t.x; let dy = py - t.y; let dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < radius + t.r) return { hit: true, nx: dx/dist, ny: dy/dist, pen: (radius + t.r) - dist };
             } 
             else if (t.type === 'slope') {
-                // Lokális térbe forgatás
                 let cx = t.x + t.w/2; let cy = t.y + t.h/2;
                 let dx = px - cx; let dy = py - cy;
                 let rdx = dx * Math.cos(-t.angle) - dy * Math.sin(-t.angle);
@@ -334,24 +325,21 @@
                 let dist = Math.sqrt(cdx*cdx + cdy*cdy);
 
                 if (dist < radius) {
-                    let nx_l = dist === 0 ? 0 : cdx/dist;
-                    let ny_l = dist === 0 ? -1 : cdy/dist;
+                    let nx_l = dist === 0 ? 0 : cdx/dist; let ny_l = dist === 0 ? -1 : cdy/dist;
                     if (dist === 0) { ny_l = -1; dist = 0.1; }
-                    // Visszaforgatás globális térbe
                     let nx = nx_l * Math.cos(t.angle) - ny_l * Math.sin(t.angle);
                     let ny = nx_l * Math.sin(t.angle) + ny_l * Math.cos(t.angle);
                     return { hit: true, nx: nx, ny: ny, pen: radius - dist };
                 }
             } 
-            else { // rect
+            else { 
                 let closestX = Math.max(t.x, Math.min(px, t.x + t.w));
                 let closestY = Math.max(t.y, Math.min(py, t.y + t.h));
                 let dx = px - closestX; let dy = py - closestY;
                 let dist = Math.sqrt(dx*dx + dy*dy);
 
                 if (dist < radius) {
-                    let nx = dist === 0 ? 0 : dx/dist;
-                    let ny = dist === 0 ? -1 : dy/dist;
+                    let nx = dist === 0 ? 0 : dx/dist; let ny = dist === 0 ? -1 : dy/dist;
                     if (dist === 0) { ny = -1; dist = 0.1; }
                     return { hit: true, nx: nx, ny: ny, pen: radius - dist };
                 }
@@ -369,10 +357,8 @@
 
             if (gameState !== STATE_PLAYING) return;
 
-            // Folyamatos pályagenerálás ahogy haladunk
             if (cameraX + canvas.width > genX - 500) {
                 generateObstacle();
-                // Memória takarítás
                 terrain = terrain.filter(t => t.x > cameraX - 1000);
             }
 
@@ -397,7 +383,6 @@
             while (bike.angle > Math.PI) bike.angle -= Math.PI * 2;
             while (bike.angle < -Math.PI) bike.angle += Math.PI * 2;
 
-            // FEJ ÜTKÖZÉS (HALÁL)
             let headRx = 10 * bike.dir; let headRy = -55;
             let headWx = bike.x + Math.cos(bike.angle)*headRx - Math.sin(bike.angle)*headRy;
             let headWy = bike.y + Math.sin(bike.angle)*headRx + Math.cos(bike.angle)*headRy;
@@ -410,16 +395,15 @@
             let hitGroundThisFrame = false;
 
             const collisionPoints = [
-                { rx: -25 * bike.dir, ry: 10, radius: 12 }, // Hátsó
-                { rx: 30 * bike.dir,  ry: 10, radius: 12 }, // Első
-                { rx: 0,              ry: 0,  radius: 10 }  // Közép
+                { rx: -25 * bike.dir, ry: 10, radius: 12 }, 
+                { rx: 30 * bike.dir,  ry: 10, radius: 12 }, 
+                { rx: 0,              ry: 0,  radius: 10 }  
             ];
 
             for (let p of collisionPoints) {
                 let wx = bike.x + Math.cos(bike.angle)*p.rx - Math.sin(bike.angle)*p.ry;
                 let wy = bike.y + Math.sin(bike.angle)*p.rx + Math.cos(bike.angle)*p.ry;
 
-                // Bal oldali láthatatlan fal (Nem mehet vissza)
                 let leftBound = cameraX - 50;
                 if (wx - p.radius < leftBound) { 
                     bike.x += Math.abs(wx - p.radius - leftBound); 
@@ -430,11 +414,9 @@
                 for (let t of terrain) {
                     let c = checkCollision(wx, wy, p.radius, t);
                     if (c.hit) {
-                        // Pozíció korrekció
                         bike.x += c.nx * c.pen;
                         bike.y += c.ny * c.pen;
 
-                        // PONTSZÁMÍTÁS (Ha ez egy új akadály és földet értünk rajta)
                         if (!t.landed && c.ny < -0.5) { 
                             t.landed = true;
                             score++;
@@ -460,7 +442,6 @@
                 bike.tuckFactor = Math.max(0, bike.tuckFactor - 0.1); 
             }
             
-            // ZUHANÁS HALÁL
             if (bike.y > cameraY + canvas.height + 100) gameState = STATE_GAMEOVER;
         }
 
@@ -478,11 +459,10 @@
             ctx.save();
             ctx.translate(-cameraX, -cameraY);
 
-            // --- PÁLYA RAJZOLÁSA ---
             ctx.lineJoin = "miter"; ctx.lineCap = "butt";
             for (let t of terrain) {
                 ctx.fillStyle = colors.platform;
-                let edgeColor = t.landed ? colors.scored : colors.main; // Színváltás, ha pontot ért!
+                let edgeColor = t.landed ? colors.scored : colors.main; 
 
                 if (t.type === 'rect') {
                     ctx.fillRect(t.x, t.y, t.w, t.h);
@@ -506,12 +486,9 @@
                 }
             }
 
-            // CÉLZÓ VONAL
             if (isDragging && gameState === STATE_PLAYING) {
-                let aimX = dragStart.x - dragCurrent.x;
-                let aimY = dragStart.y - dragCurrent.y;
-                let dragX = dragCurrent.x - dragStart.x;
-                let dragY = dragCurrent.y - dragStart.y;
+                let aimX = dragStart.x - dragCurrent.x; let aimY = dragStart.y - dragCurrent.y;
+                let dragX = dragCurrent.x - dragStart.x; let dragY = dragCurrent.y - dragStart.y;
                 let aimLen = Math.sqrt(aimX * aimX + aimY * aimY);
 
                 if (aimLen > maxDragDistance) {
@@ -529,7 +506,6 @@
                 }
             }
 
-            // --- BRINGA RAJZOLÁS ---
             ctx.save();
             ctx.translate(bike.x, bike.y); ctx.rotate(bike.angle); ctx.scale(bike.dir, 1); 
             ctx.lineCap = "square"; ctx.lineJoin = "miter";
@@ -545,7 +521,6 @@
             ctx.moveTo(20, -15); ctx.lineTo(-10, 0); ctx.lineTo(-25, 10); ctx.moveTo(-10, 0); ctx.lineTo(0, 10); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(20, -15); ctx.lineTo(18, -20); ctx.lineTo(22, -22); ctx.stroke();
 
-            // --- NEON ARIFER ---
             ctx.beginPath();
             ctx.strokeStyle = gameState !== STATE_PLAYING ? colors.alt : colors.main; 
             ctx.lineWidth = 4; ctx.shadowBlur = 10; ctx.shadowColor = ctx.strokeStyle;
@@ -578,7 +553,6 @@
             ctx.beginPath(); ctx.arc(head.x, head.y, 8, 0, Math.PI * 2); ctx.fillStyle = ctx.strokeStyle; ctx.fill();
             ctx.shadowBlur = 0; ctx.restore(); ctx.restore(); 
 
-            // --- OVERLAY SZÖVEGEK ---
             if (gameState === STATE_GAMEOVER) {
                 ctx.fillStyle = "rgba(0, 0, 0, 0.9)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = colors.alt; ctx.font = "bold 55px sans-serif"; ctx.textAlign = "center";
