@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Végtelen Trial Bringa</title>
+    <title>Végtelen Trial Bringa - Arcade Mód</title>
     <style>
         body {
             margin: 0;
             padding: 0;
-            background-color: #111; /* Sötét háttér a játéktéren kívül */
+            background-color: #111; 
             display: flex;
             justify-content: center;
             align-items: center;
@@ -18,9 +18,8 @@
             touch-action: none; 
         }
         canvas {
-            background-color: #f0f4f8; /* Világos kékesszürke égbolt */
+            background-color: #f0f4f8; 
             box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-            /* Vertikális optimalizáció */
             max-width: 100vw;
             max-height: 100vh;
             object-fit: contain;
@@ -47,14 +46,18 @@
             font-size: 1.2rem;
             margin: 5px;
         }
-        #help { font-size: 0.8rem; color: #666; display: block; margin-top: 5px; }
+        .heart { color: #e74c3c; }
+        #help { font-size: 0.8rem; color: #666; display: block; margin-top: 5px; background: rgba(255,255,255,0.7); display: inline-block; padding: 2px 8px; border-radius: 10px;}
     </style>
 </head>
 <body>
 
     <div id="ui">
-        <div class="hud">Szint: <span id="scoreDisplay">0</span></div>
-        <span id="help">Húzd hátra a gumit! (A gép megemeli az elejét)</span>
+        <div class="hud">
+            <span class="heart">❤</span> <span id="livesDisplay">3</span> | 
+            Szint: <span id="scoreDisplay">0</span>
+        </div>
+        <br><span id="help">Minden 5. szint után bónusz élet!</span>
     </div>
 
     <canvas id="gameCanvas" width="600" height="900"></canvas>
@@ -63,13 +66,20 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoreDisplay = document.getElementById('scoreDisplay');
+        const livesDisplay = document.getElementById('livesDisplay');
 
-        // Játék és Kamera állapot
+        // JÁTÉK ÁLLAPOTOK
+        const STATE_PLAYING = 0;
+        const STATE_CRASHED = 1;  // Fejbeverés vagy leesés, vár a kattintásra
+        const STATE_GAMEOVER = 2; // Nincs több élet
+
+        let gameState = STATE_PLAYING;
         let isDragging = false;
         let dragStart = { x: 0, y: 0 };
         let dragCurrent = { x: 0, y: 0 };
         
         let score = 0;
+        let lives = 3;
         let cameraY = 0;
         let targetCameraY = 0;
         let lastCheckpoint = { x: 300, y: 800 };
@@ -77,7 +87,7 @@
         // BEÁLLÍTÁSOK
         const jumpPower = 0.045; 
         const gravity = 0.4;
-        const bounceFactor = 0.4; // Kicsit kevésbé pattan a falakon
+        const bounceFactor = 0.4; 
         const poseStates = { GROUNDED: 0, AIRBORNE: 1, TAKING_OFF: 2 }; 
 
         let bike = {
@@ -90,9 +100,12 @@
         let terrain = [];
         let goal = { x: 0, y: 0, radius: 18 };
 
-        // Pályagenerátor darabokban (felfelé)
+        function updateHUD() {
+            scoreDisplay.innerText = score;
+            livesDisplay.innerText = lives;
+        }
+
         function generateChunk(startY, endY) {
-            // Sárga Cél generálása a szakasz tetején
             const goalPlatform = { 
                 x: 100 + Math.random() * 300, 
                 y: endY + 20, 
@@ -103,7 +116,6 @@
             goal.x = goalPlatform.x + goalPlatform.w / 2;
             goal.y = goalPlatform.y - 20;
 
-            // Random ugrálók a két szint közé
             let currentY = startY - 150;
             while(currentY > endY + 150) {
                 terrain.push({
@@ -116,20 +128,24 @@
             }
         }
 
-        // Játék kezdése
+        // Teljes nullázás (Game Over után)
         function initGame() {
             score = 0;
+            lives = 3;
             cameraY = 0;
             targetCameraY = 0;
             terrain = [];
+            updateHUD();
             
-            terrain.push({ x: 0, y: 850, w: 600, h: 50 }); // Kezdő padló
+            terrain.push({ x: 0, y: 850, w: 600, h: 50 }); // Padló
             
-            generateChunk(850, 150); // Első szakasz (850-től fel 150-ig)
+            generateChunk(850, 150);
             lastCheckpoint = { x: 300, y: 800 };
+            gameState = STATE_PLAYING;
             resetToCheckpoint();
         }
 
+        // Vissza a Checkponthoz (Életvesztés után)
         function resetToCheckpoint() {
             bike.x = lastCheckpoint.x;
             bike.y = lastCheckpoint.y;
@@ -141,21 +157,48 @@
             bike.grounded = true;
             bike.tuckFactor = 0;
             isDragging = false;
+            // Ha leesett a kamera is alá, visszahúzzuk
+            if (cameraY < targetCameraY - 500) {
+                cameraY = targetCameraY;
+            }
         }
 
-        // Világkoordináták kiszámítása a kamerához igazítva
+        // Halál logika (fejbeverés vagy szakadék)
+        function triggerCrash() {
+            lives--;
+            updateHUD();
+            if (lives > 0) {
+                gameState = STATE_CRASHED; // Freeze frame
+            } else {
+                gameState = STATE_GAMEOVER; // Vége
+            }
+            isDragging = false;
+        }
+
         function getPointerPos(clientX, clientY) {
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
             return {
                 x: (clientX - rect.left) * scaleX,
-                y: (clientY - rect.top) * scaleY + cameraY // Y eltolás!
+                y: (clientY - rect.top) * scaleY + cameraY 
             };
         }
 
         function startDrag(x, y) {
-            if (bike.grounded) {
+            // UI Kattintások kezelése halál esetén
+            if (gameState === STATE_CRASHED) {
+                gameState = STATE_PLAYING;
+                resetToCheckpoint();
+                return;
+            }
+            if (gameState === STATE_GAMEOVER) {
+                initGame();
+                return;
+            }
+
+            // Normál játékmenet
+            if (bike.grounded && gameState === STATE_PLAYING) {
                 isDragging = true;
                 dragStart = { x, y };
                 dragCurrent = { x, y };
@@ -164,7 +207,7 @@
         }
 
         function moveDrag(x, y) {
-            if (isDragging) {
+            if (isDragging && gameState === STATE_PLAYING) {
                 dragCurrent = { x, y };
                 const pullX = dragCurrent.x - dragStart.x;
                 if (pullX < -10) bike.dir = 1; 
@@ -173,7 +216,7 @@
         }
 
         function endDrag() {
-            if (isDragging) {
+            if (isDragging && gameState === STATE_PLAYING) {
                 isDragging = false;
                 const aimX = dragStart.x - dragCurrent.x;
                 const aimY = dragStart.y - dragCurrent.y;
@@ -216,8 +259,11 @@
         window.addEventListener('touchend', endDrag);
 
         function updatePhysics() {
-            // Finom kamera követés
+            // Finom kamera követés (mindig megy, halálkor is picit csúszik)
             cameraY += (targetCameraY - cameraY) * 0.08;
+
+            // HA MEGHALTUNK, MEGÁLL A FIZIKA (Freeze Frame)
+            if (gameState !== STATE_PLAYING) return;
 
             bike.vy += gravity;
 
@@ -225,19 +271,15 @@
                 bike.tuckFactor = Math.min(1, bike.tuckFactor + 0.05);
             }
 
-            // --- ÚJ: HÁTRADŐLÉS (WHEELIE) LENDÜLETVÉTELKOR ---
             if (isDragging && bike.grounded) {
                 const pullX = dragCurrent.x - dragStart.x;
                 const pullY = dragCurrent.y - dragStart.y;
                 let localPullX = pullX * bike.dir; 
                 let pullLen = Math.sqrt(localPullX*localPullX + pullY*pullY);
                 
-                // Maximum 150 pixel húzásig növekszik a dőlés
                 let tiltAmount = Math.min(pullLen, 150) / 150; 
-                // A dőlés iránya függ attól, merre néz a bringa
                 let targetAngle = -0.5 * tiltAmount * bike.dir; 
                 
-                // Folyamatos, puha dőlés hátrafele
                 bike.angle += (targetAngle - bike.angle) * 0.15;
             }
 
@@ -248,8 +290,7 @@
             while (bike.angle > Math.PI) bike.angle -= Math.PI * 2;
             while (bike.angle < -Math.PI) bike.angle += Math.PI * 2;
 
-            // --- FEJ ÜTKÖZÉS (GAME OVER / RESET) ---
-            // A megnövelt bringás miatt a fej pozíciója magasabban van!
+            // --- FEJ ÜTKÖZÉS (HALÁL) ---
             let headRx = 10 * bike.dir; 
             let headRy = -55;
             let headWx = bike.x + Math.cos(bike.angle)*headRx - Math.sin(bike.angle)*headRy;
@@ -260,15 +301,14 @@
                 let closestY = Math.max(t.y, Math.min(headWy, t.y + t.h));
                 let dx = headWx - closestX;
                 let dy = headWy - closestY;
-                if (Math.sqrt(dx*dx + dy*dy) < 12) { // Fej sugara
-                    resetToCheckpoint();
+                if (Math.sqrt(dx*dx + dy*dy) < 12) { 
+                    triggerCrash(); // MEGFIZETETT HIBÁZÁS
                     return; 
                 }
             }
 
             let hitGroundThisFrame = false;
 
-            // Kerekek és közép
             const collisionPoints = [
                 { rx: -25 * bike.dir, ry: 10, radius: 12 }, 
                 { rx: 30 * bike.dir,  ry: 10, radius: 12 }, 
@@ -279,21 +319,19 @@
                 let wx = bike.x + Math.cos(bike.angle)*p.rx - Math.sin(bike.angle)*p.ry;
                 let wy = bike.y + Math.sin(bike.angle)*p.rx + Math.cos(bike.angle)*p.ry;
 
-                // Végtelen falak logikája (nem tömbben tároljuk, fix matematikai határ)
-                if (wx - p.radius < 0) { // Bal fal
+                if (wx - p.radius < 0) { 
                     bike.x += Math.abs(wx - p.radius);
                     bike.vx = Math.abs(bike.vx) * bounceFactor;
                     bike.angVel *= -0.3;
-                    wx = p.radius; // frissítés a padlóhoz
+                    wx = p.radius; 
                 }
-                if (wx + p.radius > canvas.width) { // Jobb fal
+                if (wx + p.radius > canvas.width) { 
                     bike.x -= Math.abs((wx + p.radius) - canvas.width);
                     bike.vx = -Math.abs(bike.vx) * bounceFactor;
                     bike.angVel *= -0.3;
                     wx = canvas.width - p.radius;
                 }
 
-                // Platform ütközések
                 for (let t of terrain) {
                     let closestX = Math.max(t.x, Math.min(wx, t.x + t.w));
                     let closestY = Math.max(t.y, Math.min(wy, t.y + t.h));
@@ -340,45 +378,39 @@
             let distToGoal = Math.sqrt(Math.pow(bike.x - goal.x, 2) + Math.pow(bike.y - goal.y, 2));
             if (distToGoal < bike.radius + goal.radius) {
                 score++;
-                scoreDisplay.innerText = score;
                 
-                // Mentjük a pozíciót biztonságba
+                // +1 Élet minden 5. pályán!
+                if (score % 5 === 0) {
+                    lives++;
+                }
+                updateHUD();
+                
                 lastCheckpoint = { x: goal.x, y: goal.y - 20 };
-                
-                // Generáljuk a következő szintet felfelé
                 let newEndY = goal.y - 800; 
                 generateChunk(goal.y, newEndY);
-                
-                // Kamera célt adunk (hogy a mostani cél kerüljön a képernyő aljára)
                 targetCameraY = goal.y - 750;
-                
-                // Kipucoljuk a nagyon régi, lent maradt platformokat a memóriából
                 terrain = terrain.filter(t => t.y < cameraY + 1500);
             }
 
-            // Halál zóna (Ha leesik a képernyő alján túlra)
-            if (bike.y > cameraY + canvas.height + 100) {
-                resetToCheckpoint();
+            // Leesés halál (Ha kiesel a képből lefelé)
+            if (bike.y > cameraY + canvas.height + 50) {
+                triggerCrash();
             }
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // KAMERA ELTOLÁS
             ctx.save();
             ctx.translate(0, -cameraY);
 
-            // Végtelen falak vizuális rajzolása a látható területen
             ctx.fillStyle = "#88929b";
-            ctx.fillRect(0, cameraY - 100, 15, canvas.height + 200); // Bal fal
-            ctx.fillRect(canvas.width - 15, cameraY - 100, 15, canvas.height + 200); // Jobb fal
+            ctx.fillRect(0, cameraY - 100, 15, canvas.height + 200); 
+            ctx.fillRect(canvas.width - 15, cameraY - 100, 15, canvas.height + 200); 
 
-            // Platformok
             ctx.fillStyle = "#4a5568";
             for (let t of terrain) ctx.fillRect(t.x, t.y, t.w, t.h);
 
-            // Cél
             ctx.beginPath();
             ctx.arc(goal.x, goal.y, goal.radius, 0, Math.PI * 2);
             ctx.fillStyle = "#FFD700"; 
@@ -387,9 +419,7 @@
             ctx.lineWidth = 4;
             ctx.stroke();
 
-            // Célzó vonalak
-            if (isDragging) {
-                // A vonalak pozícióját is kameratérben rajzoljuk
+            if (isDragging && gameState === STATE_PLAYING) {
                 const aimX = dragStart.x - dragCurrent.x;
                 const aimY = dragStart.y - dragCurrent.y;
                 const pullX = dragCurrent.x - dragStart.x;
@@ -451,20 +481,20 @@
             ctx.lineTo(22, -22); 
             ctx.stroke();
 
-            // --- ARIFER (Sokkal Nagyobb Bringás) ---
+            // --- ARIFER ---
             ctx.beginPath();
-            ctx.strokeStyle = "#1a73e8"; 
-            ctx.lineWidth = 4; // Vastagabb vonalak a testnek
+            // Pirosra vált a ruhája, ha beveri a fejét!
+            ctx.strokeStyle = gameState !== STATE_PLAYING ? "#e74c3c" : "#1a73e8"; 
+            ctx.lineWidth = 4; 
             
             const hands = { x: 20, y: -22 };  
             const pedals = { x: 0, y: 10 };   
             
-            // Felnagyított alap pontok
             let butt = { x: -12, y: -22 };   
             let shoulder = { x: 5, y: -45 }; 
             let head = { x: 10, y: -55 };     
 
-            if (isDragging) {
+            if (isDragging && gameState === STATE_PLAYING) {
                 const pullX = dragCurrent.x - dragStart.x;
                 const pullY = dragCurrent.y - dragStart.y;
                 const localPullX = pullX * bike.dir;
@@ -473,7 +503,6 @@
                 let moveX = 0, moveY = 0;
                 
                 if (pullLen > 0) {
-                    // Megnövelt mozgástér a nagyobb testnek
                     moveX = (localPullX / pullLen) * Math.min(pullLen * 0.15, 20);
                     moveY = (pullY / pullLen) * Math.min(pullLen * 0.15, 20);
                 }
@@ -486,7 +515,6 @@
                 head.y += moveY;
 
             } else if (!bike.grounded && bike.pose === poseStates.AIRBORNE) {
-                // Nagyobb összehúzódás a levegőben
                 butt.x += 10 * bike.tuckFactor;
                 butt.y += 8 * bike.tuckFactor;
                 shoulder.x += 12 * bike.tuckFactor;
@@ -513,13 +541,38 @@
             ctx.stroke();
 
             ctx.beginPath();
-            ctx.arc(head.x, head.y, 8, 0, Math.PI * 2); // Nagyobb fej
-            ctx.fillStyle = "#1a73e8";
+            ctx.arc(head.x, head.y, 8, 0, Math.PI * 2); 
+            ctx.fillStyle = gameState !== STATE_PLAYING ? "#e74c3c" : "#1a73e8";
             ctx.fill();
             ctx.stroke();
 
             ctx.restore();
             ctx.restore(); // Kamera visszaállítása
+
+            // --- UI OVERLAY (Halál és Game Over szövegek) ---
+            if (gameState === STATE_CRASHED) {
+                ctx.fillStyle = "rgba(231, 76, 60, 0.3)"; // Halvány piros
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = "#fff";
+                ctx.font = "bold 40px sans-serif";
+                ctx.textAlign = "center";
+                ctx.fillText("BUKTÁL!", canvas.width / 2, canvas.height / 2 - 20);
+                ctx.font = "20px sans-serif";
+                ctx.fillText("Kattints a folytatáshoz (-1 élet)", canvas.width / 2, canvas.height / 2 + 20);
+            } else if (gameState === STATE_GAMEOVER) {
+                ctx.fillStyle = "rgba(0, 0, 0, 0.8)"; // Sötét fekete
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = "#fff";
+                ctx.font = "bold 50px sans-serif";
+                ctx.textAlign = "center";
+                ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 40);
+                ctx.font = "24px sans-serif";
+                ctx.fillStyle = "#f1c40f";
+                ctx.fillText(`Elért Szint: ${score}`, canvas.width / 2, canvas.height / 2 + 10);
+                ctx.fillStyle = "#fff";
+                ctx.font = "20px sans-serif";
+                ctx.fillText("Kattints az újrakezdéshez!", canvas.width / 2, canvas.height / 2 + 50);
+            }
         }
 
         function gameLoop() {
