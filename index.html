@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Trial Sidescroller</title>
+    <title>Neon Trial - Portrait Sidescroller</title>
     <style>
         :root {
             --bg-color: #0b0c10;
@@ -30,10 +30,13 @@
             color: var(--text-color);
         }
 
+        /* Álló képernyőre feszítés torzítás nélkül */
         canvas {
             box-shadow: 0 0 50px rgba(0, 0, 0, 0.9);
             max-width: 100vw;
             max-height: 100vh;
+            width: 100%;
+            height: 100%;
             object-fit: contain;
             cursor: crosshair;
         }
@@ -44,13 +47,14 @@
             left: 50%;
             transform: translateX(-50%);
             pointer-events: none;
-            width: auto;
+            width: 100%;
+            text-align: center;
         }
 
         #ui-bottom-left {
             position: absolute;
             bottom: 20px;
-            left: 20px;
+            left: 10px;
             pointer-events: none;
         }
 
@@ -58,25 +62,25 @@
             display: inline-block;
             background: var(--ui-bg);
             border: 1px solid var(--ui-border);
-            padding: 10px 25px;
-            border-radius: 4px;
+            padding: 8px 20px;
+            border-radius: 6px;
             font-weight: bold;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.6);
-            font-size: 1.1rem;
+            font-size: 1rem;
             text-transform: uppercase;
-            letter-spacing: 1.5px;
+            letter-spacing: 1px;
             backdrop-filter: blur(5px);
         }
 
         .hud-small {
-            padding: 6px 15px;
-            font-size: 0.9rem;
+            padding: 4px 10px;
+            font-size: 0.8rem;
             border-color: rgba(255, 255, 255, 0.1);
             color: rgba(255, 255, 255, 0.6);
         }
 
         .heart { color: var(--neon-alt); }
-        .score-num { color: var(--neon-goal); font-size: 1.3rem; }
+        .score-num { color: var(--neon-goal); font-size: 1.2rem; }
     </style>
 </head>
 <body>
@@ -92,7 +96,7 @@
         <div class="hud hud-small" id="generationDisplay">RUN #0</div>
     </div>
 
-    <canvas id="gameCanvas" width="1000" height="600"></canvas>
+    <canvas id="gameCanvas" width="540" height="960"></canvas>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
@@ -111,18 +115,18 @@
         let dragCurrent = { x: 0, y: 0 };
         
         let generationCount = 0; 
-        const maxDragDistance = 250; // Vízszintesen adhatunk egy picit nagyobbat ugrani
+        const maxDragDistance = 220;
 
         let score = 0;
         let lives = 3;
         
-        // --- 2D KAMERA ---
         let cameraX = 0;
         let targetCameraX = 0;
         let cameraY = 0;
         let targetCameraY = 0;
         
-        let lastCheckpoint = { x: 200, y: 300 };
+        let lastCheckpoint = { x: 150, y: 650 };
+        let lastGenY = 700; // Pályagenerátor magasságának nyomon követése
         let pulseGlow = 0; 
         let bgPulse = 0; 
 
@@ -141,7 +145,7 @@
         const poseStates = { GROUNDED: 0, AIRBORNE: 1, TAKING_OFF: 2 }; 
 
         let bike = {
-            x: 200, y: 300, vx: 0, vy: 0, radius: 15, 
+            x: 150, y: 650, vx: 0, vy: 0, radius: 15, 
             angle: 0, angVel: 0, grounded: false,
             pose: poseStates.GROUNDED, tuckFactor: 0,
             dir: 1 
@@ -155,33 +159,16 @@
             livesDisplay.innerText = lives;
         }
 
-        // --- VÍZSZINTES PÁLYAGENERÁTOR ---
+        // Vízszintes generátor, álló kijelzőhöz optimalizált hézagokkal
         function generateChunk(startX, endX) {
-            // Cél platform a szakasz végén
-            const goalPlatform = { 
-                x: endX - 150, 
-                y: 200 + Math.random() * 300, // Random magasság
-                w: 150, 
-                h: 20 
-            };
-            terrain.push(goalPlatform);
-            goal.x = goalPlatform.x + goalPlatform.w / 2;
-            goal.y = goalPlatform.y - 20;
-
-            const minGap = 120; // Legalább ennyi hely kell horizontálisan két elem között
-            let currentX = startX + minGap + 50; 
-            let lastY = 400; // Induló magasság
+            let currentX = startX + 100; 
             
-            while(currentX < endX - 250) {
-                let pWidth = 80 + Math.random() * 100; 
+            while(currentX < endX - 200) {
+                let pWidth = 70 + Math.random() * 80; 
                 let pHeight = 20;
                 
-                // Az Y pozíció maximum 150 pixelt ugorhat fel vagy le az előzőhöz képest
-                let nextY = lastY + (Math.random() * 300 - 150);
-                
-                // Határok között tartjuk, hogy ne repüljön ki a világűrbe
-                if (nextY < 150) nextY = 150 + Math.random() * 50;
-                if (nextY > 800) nextY = 800 - Math.random() * 50;
+                // Maximum 200 pixelt ugrálhat le-fel
+                let nextY = lastGenY + (Math.random() * 400 - 200);
 
                 terrain.push({
                     x: currentX,
@@ -190,9 +177,22 @@
                     h: pHeight
                 });
                 
-                lastY = nextY;
-                currentX += (pWidth + minGap + Math.random() * 80);
+                lastGenY = nextY;
+                // Kisebb ugrási távok az álló képernyő miatt (90 - 160px)
+                currentX += (pWidth + 90 + Math.random() * 70);
             }
+
+            // Cél platform a szakasz végén
+            const goalPlatform = { 
+                x: currentX, 
+                y: lastGenY + (Math.random() * 200 - 100), 
+                w: 120, 
+                h: 20 
+            };
+            terrain.push(goalPlatform);
+            goal.x = goalPlatform.x + goalPlatform.w / 2;
+            goal.y = goalPlatform.y - 20;
+            lastGenY = goalPlatform.y;
         }
 
         function initGame() {
@@ -208,13 +208,12 @@
             terrain = [];
             updateHUD();
             
-            // Kezdő padló
-            terrain.push({ x: 50, y: 400, w: 300, h: 50 }); 
+            lastGenY = 700;
+            terrain.push({ x: 50, y: lastGenY, w: 200, h: 50 }); 
             
-            // Első szakasz generálása X: 350-től X: 2500-ig
-            generateChunk(350, 2500);
+            generateChunk(250, 2000);
             
-            lastCheckpoint = { x: 200, y: 350 };
+            lastCheckpoint = { x: 150, y: lastGenY - 50 };
             gameState = STATE_PLAYING;
             resetToCheckpoint();
         }
@@ -231,9 +230,9 @@
             bike.tuckFactor = 0;
             isDragging = false;
             
-            // A bringa legyen a képernyő bal harmadánál
-            targetCameraX = bike.x - 250;
-            targetCameraY = bike.y - 400;
+            // Kamera igazítása: Bringás balra tolva (120px), és lejjebb (650px fentről)
+            targetCameraX = bike.x - 120;
+            targetCameraY = bike.y - 650;
             cameraX = targetCameraX; 
             cameraY = targetCameraY; 
         }
@@ -251,7 +250,6 @@
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
             return {
-                // X és Y kamerát is beleszámoljuk
                 x: (clientX - rect.left) * scaleX + cameraX,
                 y: (clientY - rect.top) * scaleY + cameraY 
             };
@@ -317,11 +315,10 @@
         window.addEventListener('touchend', endDrag);
 
         function updatePhysics() {
-            // --- X/Y KAMERA KÖVETÉS ---
-            targetCameraX = bike.x - 250; // Bal harmad
-            targetCameraY = bike.y - 400; // Alsó harmad
-            cameraX += (targetCameraX - cameraX) * 0.06;
-            cameraY += (targetCameraY - cameraY) * 0.06;
+            targetCameraX = bike.x - 120; // Hogy lássuk mi van jobbra
+            targetCameraY = bike.y - 650; // Hogy lássuk mi van felettünk
+            cameraX += (targetCameraX - cameraX) * 0.08;
+            cameraY += (targetCameraY - cameraY) * 0.08;
 
             pulseGlow = (pulseGlow + 0.05) % (Math.PI * 2);
             bgPulse = (bgPulse + 0.002) % (Math.PI * 2);
@@ -377,8 +374,8 @@
                 let wx = bike.x + Math.cos(bike.angle)*p.rx - Math.sin(bike.angle)*p.ry;
                 let wy = bike.y + Math.sin(bike.angle)*p.rx + Math.cos(bike.angle)*p.ry;
 
-                // Puha, láthatatlan bal oldali fal (hogy ne menj ki a mapról hátrafelé)
-                let leftBound = cameraX - 100;
+                // Láthatatlan hátsó fal, hogy ne ess ki balra
+                let leftBound = cameraX - 50;
                 if (wx - p.radius < leftBound) { 
                     bike.x += Math.abs(wx - p.radius - leftBound); 
                     bike.vx = Math.abs(bike.vx) * bounceFactor; 
@@ -424,36 +421,31 @@
                 updateHUD();
                 lastCheckpoint = { x: goal.x, y: goal.y - 20 };
                 
-                // Új chunk generálása jobbra
-                let newEndX = goal.x + 2000; 
-                generateChunk(goal.x + 100, newEndX);
+                // Pálya folytatása jobbra
+                generateChunk(goal.x + 150, goal.x + 2000);
                 
-                // Töröljük a régieket a memóriából
+                // Töröljük a régieket
                 terrain = terrain.filter(t => t.x > cameraX - 1000);
             }
 
-            // --- HALÁL ZÓNA --- (Ha beesik a szakadékba)
-            if (bike.y > cameraY + canvas.height + 200) triggerCrash();
+            // Halál (ha kiesel a képernyő alján)
+            if (bike.y > cameraY + canvas.height + 150) triggerCrash();
         }
 
         function draw() {
-            // HÁTTÉR (Fix a képernyőhöz képest)
             ctx.fillStyle = colors.bg;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
             let centerPulse = Math.sin(bgPulse) * 0.03 + 0.03;
-            // Radiális fény középen a hangulat kedvéért
             let grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.width);
             grad.addColorStop(0, `rgba(102, 252, 241, ${centerPulse})`);
             grad.addColorStop(1, "transparent");
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // KAMERA ELTOLÁS!
             ctx.save();
             ctx.translate(-cameraX, -cameraY);
 
-            // PLATFORMOK
             ctx.lineJoin = "miter";
             ctx.lineCap = "butt";
             for (let t of terrain) {
@@ -463,11 +455,10 @@
                 ctx.moveTo(t.x, t.y + 1);
                 ctx.lineTo(t.x + t.w, t.y + 1);
                 ctx.lineWidth = 2;
-                ctx.strokeStyle = t.w === 150 ? colors.goal : colors.main; 
+                ctx.strokeStyle = t.w === 120 ? colors.goal : colors.main; 
                 ctx.stroke();
             }
 
-            // CÉL
             ctx.beginPath();
             ctx.arc(goal.x, goal.y, goal.radius, 0, Math.PI * 2);
             let glow = 10 + Math.sin(pulseGlow) * 4;
@@ -480,7 +471,6 @@
             ctx.stroke();
             ctx.shadowBlur = 0; 
 
-            // CÉLZÓ VONAL
             if (isDragging && gameState === STATE_PLAYING) {
                 let aimX = dragStart.x - dragCurrent.x;
                 let aimY = dragStart.y - dragCurrent.y;
@@ -498,7 +488,7 @@
                 ctx.beginPath();
                 ctx.moveTo(bike.x, bike.y);
                 ctx.lineTo(bike.x + aimX, bike.y + aimY);
-                ctx.strokeStyle = "rgba(102, 252, 241, 0.5)"; // Cián szaggatott
+                ctx.strokeStyle = "rgba(102, 252, 241, 0.5)"; 
                 ctx.lineWidth = 2;
                 ctx.setLineDash([8, 6]);
                 ctx.stroke();
@@ -517,7 +507,6 @@
                 }
             }
 
-            // --- BRINGA RAJZOLÁS ---
             ctx.save();
             ctx.translate(bike.x, bike.y);
             ctx.rotate(bike.angle);
@@ -541,7 +530,6 @@
 
             ctx.beginPath(); ctx.moveTo(20, -15); ctx.lineTo(18, -20); ctx.lineTo(22, -22); ctx.stroke();
 
-            // --- NEON ARIFER ---
             ctx.beginPath();
             ctx.strokeStyle = gameState !== STATE_PLAYING ? colors.alt : colors.main; 
             ctx.lineWidth = 4; ctx.shadowBlur = 10; ctx.shadowColor = ctx.strokeStyle;
@@ -585,9 +573,8 @@
             ctx.fillStyle = ctx.strokeStyle; ctx.fill();
 
             ctx.shadowBlur = 0; ctx.restore();
-            ctx.restore(); // Kamera visszaállítása a UI miatt
+            ctx.restore(); 
 
-            // --- OVERLAY SZÖVEGEK ---
             if (gameState === STATE_CRASHED) {
                 ctx.fillStyle = "rgba(0, 0, 0, 0.4)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = "#fff"; ctx.font = "bold 40px sans-serif"; ctx.textAlign = "center";
