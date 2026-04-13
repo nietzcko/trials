@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Trial - Synthwave Survival</title>
+    <title>Neon Trial - Vertical Survival</title>
     <style>
         :root {
-            /* Igazi Synthwave paletta */
-            --bg-color: #050014;
-            --platform-body: #110022;
-            --neon-main: #00f3ff; /* Cyan */
-            --neon-alt: #ff00ff;  /* Hot Pink */
-            --neon-scored: #ffd700;
+            /* Minimalista Neon Paletta: Fekete, Szürke, Világostürkiz, Sárga */
+            --bg-color: #0b0c10;
+            --platform-body: #171d25;
+            --neon-main: #00f3ff; /* Világostürkiz (Türkizkék) */
+            --neon-alt: #ffd700;  /* Sárga */
+            --neon-scored: var(--neon-alt); /* Megegyezik a sárgával a pontszerzéshez */
             --text-color: #c5c6c7;
         }
 
@@ -103,7 +103,6 @@
         let bgBuildings = [];
         let totalBgCycleWidth = 0;
         const parallaxFactor = 0.2; 
-        const gridParallaxFactor = 0.15;
 
         const getCSSVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
         const colors = {
@@ -217,15 +216,19 @@
             
             generateBgBuildings();
             
-            // Tutorial zóna
+            // Biztonságos padló
             terrain.push({ type: 'rect', x: -200, y: 600, w: 1800, h: 150, landed: true }); 
+            
+            // Lebegő gyakorló platformok
             terrain.push({ type: 'rect', x: 400, y: 530, w: 150, h: 30, landed: false }); 
             terrain.push({ type: 'rect', x: 650, y: 460, w: 120, h: 30, landed: false }); 
             terrain.push({ type: 'rect', x: 900, y: 390, w: 100, h: 30, landed: false }); 
             
+            // ÉLES PÁLYA KEZDETE A TUTORIAL VÉGÉNÉL ÉS SZINTJÉN!
             genX = 1600; 
             genY = 600; 
 
+            // Szövegek
             tutorialTexts = [
                 { text: "DRAG & RELEASE TO JUMP", x: 250, y: 450 },
                 { text: "TILT WITH DRAG DIRECTION", x: 650, y: 350 },
@@ -445,91 +448,58 @@
         }
 
         function draw() {
-            // 1. ÉGBOLT (Synthwave színátmenet)
-            let skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            skyGrad.addColorStop(0, "#050014"); // Sötét űr kék
-            skyGrad.addColorStop(0.6, "#1a0033"); // Mélylila
-            skyGrad.addColorStop(1, "#3a005c"); // Élénkebb lila a horizonton
-            ctx.fillStyle = skyGrad;
+            // 1. ÉGBOLT (Fekete/Szürke Minimalista)
+            ctx.fillStyle = colors.bg;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 2. RETRO NAP (Lassan mozog a parallaxis miatt)
-            ctx.save();
-            const sunParallax = (cameraX * 0.05) % 1000;
-            let sunX = canvas.width / 2 - sunParallax + 200; 
-            let sunY = canvas.height * 0.55; // Picit lejjebb
-            let radius = 140;
-            
-            let sunGrad = ctx.createLinearGradient(0, sunY - radius, 0, sunY + radius);
-            sunGrad.addColorStop(0, "#ff00a0"); // Pink teteje
-            sunGrad.addColorStop(1, "#ffae00"); // Narancs/Sárga alja
-            
-            ctx.fillStyle = sunGrad;
-            ctx.beginPath();
-            ctx.arc(sunX, sunY, radius, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Nap rácsozása (Kivágás helyett a háttér színével rajzolunk csíkokat)
-            ctx.fillStyle = "#2a004a"; 
-            for(let i = 0; i < 7; i++) {
-                let h = 3 + i * 2.5;
-                let y = sunY + 10 + i * 18;
-                ctx.fillRect(sunX - radius, y, radius * 2, h);
-            }
-            ctx.restore();
-
-            // 3. VÁROS (Parallaxis)
+            // 2. VÁROS (Parallaxis)
             ctx.save();
             const bgOffset = (cameraX * parallaxFactor) % totalBgCycleWidth;
             ctx.translate(-bgOffset, 0);
 
-            let currentX = 0;
-            for (let i = 0; i < 2; i++) {
-                for (let b of bgBuildings) {
-                    let bY = canvas.height - b.h - 50;
-                    
-                    // Épület kitöltése (Sötétlila grádiens)
-                    let bGrad = ctx.createLinearGradient(0, bY, 0, bY + b.h);
-                    bGrad.addColorStop(0, "rgba(20, 0, 40, 0.95)");
-                    bGrad.addColorStop(1, "rgba(40, 0, 60, 0.95)");
-                    ctx.fillStyle = bGrad;
-                    
-                    if (b.type === 'flat') {
-                        ctx.fillRect(currentX, bY, b.w, b.h);
-                    } else {
-                        ctx.beginPath();
-                        ctx.moveTo(currentX, bY + b.h);
-                        ctx.lineTo(currentX, bY + 30);
-                        ctx.lineTo(currentX + b.w / 2, bY);
-                        ctx.lineTo(currentX + b.w, bY + 30);
-                        ctx.lineTo(currentX + b.w, bY + b.h);
-                        ctx.fill();
-                    }
+            // Sötétszürke semi-átlátszó sziluett
+            ctx.fillStyle = "rgba(40, 40, 45, 0.6)"; 
 
-                    // Pink Neon körvonal az épületeknek
-                    ctx.strokeStyle = "rgba(255, 0, 255, 0.4)"; 
-                    ctx.lineWidth = 2;
-                    if (b.type === 'flat') {
-                        ctx.strokeRect(currentX, bY, b.w, b.h);
-                    } else {
-                        ctx.beginPath();
-                        ctx.moveTo(currentX, bY + b.h);
-                        ctx.lineTo(currentX, bY + 30);
-                        ctx.lineTo(currentX + b.w / 2, bY);
-                        ctx.lineTo(currentX + b.w, bY + 30);
-                        ctx.lineTo(currentX + b.w, bY + b.h);
-                        ctx.stroke();
-                    }
-                    currentX += b.w + 10;
+            let currentX = 0;
+            // Loop pool twice to cover visible screen with scrolling
+            for (let b of bgBuildings) {
+                let bY = canvas.height - b.h - 50;
+                
+                if (b.type === 'flat') {
+                    ctx.fillRect(currentX, bY, b.w, b.h);
+                } else {
+                    ctx.beginPath();
+                    ctx.moveTo(currentX, bY + b.h);
+                    ctx.lineTo(currentX, bY + 30);
+                    ctx.lineTo(currentX + b.w / 2, bY);
+                    ctx.lineTo(currentX + b.w, bY + 30);
+                    ctx.lineTo(currentX + b.w, bY + b.h);
+                    ctx.fill();
                 }
+
+                // Halvány Neon türkiz körvonal
+                ctx.strokeStyle = "rgba(0, 243, 255, 0.15)"; 
+                ctx.lineWidth = 1;
+                if (b.type === 'flat') {
+                    ctx.strokeRect(currentX, bY, b.w, b.h);
+                } else {
+                    ctx.beginPath();
+                    ctx.moveTo(currentX, bY + b.h);
+                    ctx.lineTo(currentX, bY + 30);
+                    ctx.lineTo(currentX + b.w / 2, bY);
+                    ctx.lineTo(currentX + b.w, bY + 30);
+                    ctx.lineTo(currentX + b.w, bY + b.h);
+                    ctx.stroke();
+                }
+                currentX += b.w + 10;
             }
             ctx.restore();
 
-            // --- JÁTÉKTÉR KAMERA ELTOLÁS ---
+            // 3. JÁTÉKTÉR KAMERA ELTOLÁS ---
             ctx.save();
             ctx.translate(-cameraX, -cameraY);
 
-            // Tutorial szövegek (Cyan Neon)
+            // Tutorial szövegek (Világostürkiz Neon)
             ctx.fillStyle = "rgba(0, 243, 255, 0.6)"; 
             ctx.font = "bold 24px sans-serif";
             ctx.textAlign = "center";
@@ -543,19 +513,13 @@
             // 4. PLATFORMOK RAJZOLÁSA
             ctx.lineJoin = "miter"; ctx.lineCap = "butt";
             for (let t of terrain) {
-                ctx.fillStyle = colors.platform;
-                let edgeColor = t.landed ? colors.scored : colors.main; 
-                ctx.lineWidth = t.landed ? 4 : 2; 
-
-                // A platform oldalai picit lilásak legyenek a sötét helyett
-                let platGrad = ctx.createLinearGradient(0, t.y, 0, t.y + 50);
-                platGrad.addColorStop(0, "rgba(17, 0, 34, 1)");
-                platGrad.addColorStop(1, "rgba(5, 0, 20, 1)");
-                ctx.fillStyle = platGrad;
+                ctx.fillStyle = colors.platform; // Sötétszürke body
+                let edgeColor = t.landed ? colors.scored : colors.main; // Landolt sárga, egyéb türkiz
 
                 ctx.shadowBlur = t.landed ? 15 : 8;
                 ctx.shadowColor = edgeColor;
                 ctx.strokeStyle = edgeColor;
+                ctx.lineWidth = t.landed ? 4 : 2; 
 
                 if (t.type === 'rect') {
                     ctx.fillRect(t.x, t.y, t.w, t.h);
@@ -580,7 +544,7 @@
                 ctx.shadowBlur = 0;
             }
 
-            // 5. CÉLZÓ VONAL (Hot Pink)
+            // 5. CÉLZÓ VONAL ÉS CSÚZLI
             if (isDragging && gameState === STATE_PLAYING) {
                 let aimX = dragStart.x - dragCurrent.x; let aimY = dragStart.y - dragCurrent.y;
                 let dragX = dragCurrent.x - dragStart.x; let dragY = dragCurrent.y - dragStart.y;
@@ -591,44 +555,39 @@
                     dragX = (dragX / aimLen) * maxDragDistance; dragY = (dragY / aimLen) * maxDragDistance;
                 }
 
+                // Célzó pöttyös vonal (Türkiz)
                 ctx.beginPath(); ctx.moveTo(bike.x, bike.y); ctx.lineTo(bike.x + aimX, bike.y + aimY);
                 ctx.strokeStyle = "rgba(0, 243, 255, 0.5)"; ctx.lineWidth = 2; ctx.setLineDash([8, 6]); ctx.stroke();
                 
+                // Csúzli húzó vonal (Sárga, mert alert/akció)
                 ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(bike.x, bike.y); ctx.lineTo(bike.x + dragX, bike.y + dragY);
-                ctx.strokeStyle = "rgba(255, 0, 255, 0.8)"; ctx.lineWidth = 3; ctx.stroke(); // Pink csúzli
+                ctx.strokeStyle = "rgba(255, 215, 0, 0.8)"; ctx.lineWidth = 3; ctx.stroke(); 
                 if (aimLen >= maxDragDistance) {
                     ctx.beginPath(); ctx.fillStyle = colors.alt; ctx.arc(bike.x + dragX, bike.y + dragY, 4, 0, Math.PI * 2); ctx.fill();
                 }
             }
 
-            // 6. BRINGA RAJZOLÁS
+            // 6. BRINGA ÉS RIDER RAJZOLÁS
             ctx.save();
             ctx.translate(bike.x, bike.y); ctx.rotate(bike.angle); ctx.scale(bike.dir, 1); 
             ctx.lineCap = "square"; ctx.lineJoin = "miter";
 
+            // Kerekek (Türkiz edge)
             ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.lineWidth = 4;
             ctx.beginPath(); ctx.arc(-25, 10, 12, 0, Math.PI * 2); ctx.stroke();
             ctx.beginPath(); ctx.arc(-25, 10, 8, 0, Math.PI * 2); ctx.strokeStyle = colors.main; ctx.lineWidth = 1; ctx.stroke();
             ctx.beginPath(); ctx.arc(30, 10, 12, 0, Math.PI * 2); ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.lineWidth = 4; ctx.stroke();
             ctx.beginPath(); ctx.arc(30, 10, 8, 0, Math.PI * 2); ctx.strokeStyle = colors.main; ctx.lineWidth = 1; ctx.stroke();
 
-            ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 2;
-            ctx.beginPath(); 
-            ctx.moveTo(-25, 10); 
-            ctx.lineTo(0, 10);   
-            ctx.lineTo(20, -15); 
-            ctx.lineTo(30, 10);  
-            ctx.moveTo(20, -15); 
-            ctx.lineTo(-10, 0);  
-            ctx.lineTo(-25, 10); 
-            ctx.moveTo(-10, 0);  
-            ctx.lineTo(0, 10);   
-            ctx.stroke();
-
+            // Váz és Kormány (Közép szürke)
+            ctx.strokeStyle = "rgba(100,100,105,0.9)"; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(-25, 10); ctx.lineTo(0, 10); ctx.lineTo(20, -15); ctx.lineTo(30, 10); 
+            ctx.moveTo(20, -15); ctx.lineTo(-10, 0); ctx.lineTo(-25, 10); ctx.moveTo(-10, 0); ctx.lineTo(0, 10); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(20, -15); ctx.lineTo(18, -20); ctx.lineTo(22, -22); ctx.stroke();
 
-            // NEON EMBERKE
+            // RIDER (Türkiz/Sárga Neon)
             ctx.beginPath();
+            // Ha takin off vagy airborne, erősebb Türkiz neon
             ctx.strokeStyle = gameState !== STATE_PLAYING ? colors.alt : colors.main; 
             ctx.lineWidth = 4; ctx.shadowBlur = 10; ctx.shadowColor = ctx.strokeStyle;
             
@@ -650,6 +609,7 @@
                 head.x += 12 * bike.tuckFactor; head.y += 10 * bike.tuckFactor;
             }
 
+            // Test és végtagok rajzolása
             ctx.moveTo(butt.x, butt.y); ctx.lineTo(shoulder.x, shoulder.y); 
             let armMx = (shoulder.x + hands.x) / 2 - 5; let armMy = (shoulder.y + hands.y) / 2 - 8;
             ctx.moveTo(shoulder.x, shoulder.y); ctx.lineTo(armMx, armMy); ctx.lineTo(hands.x, hands.y);
@@ -657,26 +617,31 @@
             ctx.moveTo(butt.x, butt.y); ctx.lineTo(legMx, legMy); ctx.lineTo(pedals.x, pedals.y);
             ctx.stroke();
 
+            // Fej (Türkiz Neon)
             ctx.beginPath(); ctx.arc(head.x, head.y, 8, 0, Math.PI * 2); ctx.fillStyle = ctx.strokeStyle; ctx.fill();
             ctx.shadowBlur = 0; ctx.restore(); ctx.restore(); 
 
-            // --- GAME OVER KÉPERNYŐ ---
+            // --- GAME OVER KÉPERNYŐ OVERLAY (Minimalista Stark) ---
             if (gameState === STATE_GAMEOVER) {
-                ctx.fillStyle = "rgba(5, 0, 20, 0.9)"; // Sötétlila áttetsző réteg
+                // Stark Stark sötét overlay
+                ctx.fillStyle = "rgba(10, 10, 12, 0.95)"; 
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 
-                ctx.shadowBlur = 20;
+                // CRASHED (Nagy Sárga Neon, masszív shadow-val)
+                ctx.shadowBlur = 30;
                 ctx.shadowColor = colors.alt;
                 ctx.fillStyle = colors.alt; 
                 ctx.font = "900 55px sans-serif"; 
                 ctx.textAlign = "center";
                 ctx.fillText("CRASHED", canvas.width / 2, canvas.height / 2 - 40);
                 
+                // SCORE (Pont Sárga Neon)
                 ctx.shadowColor = colors.scored;
                 ctx.font = "900 30px sans-serif"; 
                 ctx.fillStyle = colors.scored; 
                 ctx.fillText(`SCORE: ${score}`, canvas.width / 2, canvas.height / 2 + 10);
                 
+                // RESTART INSTRUCTION (Világos szürke text)
                 ctx.shadowBlur = 0;
                 ctx.fillStyle = "#fff"; 
                 ctx.font = "16px sans-serif"; 
