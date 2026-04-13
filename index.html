@@ -54,7 +54,7 @@
             font-size: 1.5rem;
             text-transform: uppercase;
             letter-spacing: 2px;
-            text-shadow: 0 4px 10px rgba(0, 0, 0, 0.9); /* Erős árnyék a keret helyett */
+            text-shadow: 0 4px 10px rgba(0, 0, 0, 0.9); 
             color: #fff;
         }
 
@@ -123,6 +123,7 @@
         };
 
         let terrain = [];
+        let tutorialTexts = [];
 
         function updateHUD() {
             scoreDisplay.innerText = score;
@@ -196,13 +197,32 @@
             terrain = [];
             updateHUD();
             
+            // --- TUTORIAL ZÓNA ---
             genX = 0; genY = 600;
-            terrain.push({ type: 'rect', x: 0, y: 600, w: 300, h: 50, landed: true }); 
-            genX = 300;
+            
+            // Nagy, hosszú, biztonságos alsó padló
+            terrain.push({ type: 'rect', x: -200, y: 600, w: 1800, h: 150, landed: true }); 
+            
+            // Gyakorló platformok a padló felett
+            terrain.push({ type: 'rect', x: 500, y: 500, w: 150, h: 30, landed: false }); 
+            terrain.push({ type: 'rect', x: 800, y: 400, w: 100, h: 30, landed: false }); 
+            terrain.push({ type: 'rect', x: 1100, y: 300, w: 80, h: 30, landed: false }); 
+            
+            // A pálya igazi generálása az 1600-as X koordinátától indul, kb a fenti magasságban
+            genX = 1600; 
+            genY = 300;
+
+            // Tutorial szövegek a térben (X, Y koordinátákkal)
+            tutorialTexts = [
+                { text: "DRAG & RELEASE TO JUMP", x: 250, y: 450 },
+                { text: "TILT WITH DRAG DIRECTION", x: 650, y: 350 },
+                { text: "DON'T HIT YOUR HEAD!", x: 1100, y: 150 },
+                { text: "GOOD LUCK!", x: 1600, y: 200 }
+            ];
             
             for(let i=0; i<10; i++) generateObstacle();
             
-            bike.x = 150; bike.y = 550; bike.vx = 0; bike.vy = 0; bike.angle = 0; bike.angVel = 0;
+            bike.x = 100; bike.y = 550; bike.vx = 0; bike.vy = 0; bike.angle = 0; bike.angVel = 0;
             bike.pose = poseStates.GROUNDED; bike.grounded = true; bike.tuckFactor = 0;
             isDragging = false;
             
@@ -427,6 +447,15 @@
             ctx.save();
             ctx.translate(-cameraX, -cameraY);
 
+            // --- TUTORIAL SZÖVEGEK RAJZOLÁSA ---
+            ctx.fillStyle = "rgba(102, 252, 241, 0.4)"; // Neon kék, áttetsző
+            ctx.font = "bold 24px sans-serif";
+            ctx.textAlign = "center";
+            for (let txt of tutorialTexts) {
+                ctx.fillText(txt.text, txt.x, txt.y);
+            }
+
+            // Pálya rajzolása
             ctx.lineJoin = "miter"; ctx.lineCap = "butt";
             for (let t of terrain) {
                 ctx.fillStyle = colors.platform;
@@ -484,24 +513,22 @@
             ctx.beginPath(); ctx.arc(30, 10, 12, 0, Math.PI * 2); ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.lineWidth = 4; ctx.stroke();
             ctx.beginPath(); ctx.arc(30, 10, 8, 0, Math.PI * 2); ctx.strokeStyle = colors.main; ctx.lineWidth = 1; ctx.stroke();
 
-            // --- JAVÍTOTT BRINGA VÁZ ---
+            // Javított villa (30 pixel az első kerék közepe)
             ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 2;
             ctx.beginPath(); 
-            ctx.moveTo(-25, 10); // Hátsó kerék közepe
-            ctx.lineTo(0, 10);   // Hajtómű
-            ctx.lineTo(20, -15); // Kormánycsapágy
-            ctx.lineTo(30, 10);  // Első kerék közepe (VILLA JAVÍTVA)
-            ctx.moveTo(20, -15); // Kormánycsapágy
-            ctx.lineTo(-10, 0);  // Nyeregcső teteje
-            ctx.lineTo(-25, 10); // Hátsó kerék közepe
-            ctx.moveTo(-10, 0);  // Nyeregcső teteje
-            ctx.lineTo(0, 10);   // Hajtómű
+            ctx.moveTo(-25, 10); 
+            ctx.lineTo(0, 10);   
+            ctx.lineTo(20, -15); 
+            ctx.lineTo(30, 10);  
+            ctx.moveTo(20, -15); 
+            ctx.lineTo(-10, 0);  
+            ctx.lineTo(-25, 10); 
+            ctx.moveTo(-10, 0);  
+            ctx.lineTo(0, 10);   
             ctx.stroke();
 
-            // Kormány
             ctx.beginPath(); ctx.moveTo(20, -15); ctx.lineTo(18, -20); ctx.lineTo(22, -22); ctx.stroke();
 
-            // --- NEON ARIFER ---
             ctx.beginPath();
             ctx.strokeStyle = gameState !== STATE_PLAYING ? colors.alt : colors.main; 
             ctx.lineWidth = 4; ctx.shadowBlur = 10; ctx.shadowColor = ctx.strokeStyle;
