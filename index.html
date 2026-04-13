@@ -54,7 +54,7 @@
             font-size: 1.5rem;
             text-transform: uppercase;
             letter-spacing: 2px;
-            text-shadow: 0 4px 10px rgba(0, 0, 0, 0.9); /* Erős árnyék a keret helyett */
+            text-shadow: 0 4px 10px rgba(0, 0, 0, 0.9); 
             color: #fff;
         }
 
@@ -113,6 +113,7 @@
         const jumpPower = 0.045; 
         const gravity = 0.4;
         const bounceFactor = 0.4; 
+        const rotLimit = 0.8; // Max dőlésszög korlát
         const poseStates = { GROUNDED: 0, AIRBORNE: 1, TAKING_OFF: 2 }; 
 
         let bike = {
@@ -255,10 +256,7 @@
                 if (aimLen > 5) {
                     bike.vx = aimX * jumpPower;
                     bike.vy = aimY * jumpPower;
-                    bike.angVel = aimX * -0.0003; 
-                    
-                    if (bike.angVel > 0.025) bike.angVel = 0.025;
-                    if (bike.angVel < -0.025) bike.angVel = -0.025;
+                    bike.angVel = aimX * -0.00015; // Lassabb forgás indításkor
                     
                     bike.grounded = false;
                     bike.pose = poseStates.AIRBORNE; 
@@ -334,7 +332,9 @@
 
             bike.vy += gravity;
 
+            // Légellenállás a forgásnak a levegőben
             if (!bike.grounded) {
+                bike.angVel *= 0.97;
                 bike.tuckFactor = Math.min(1, bike.tuckFactor + 0.05);
             }
 
@@ -348,8 +348,10 @@
             bike.x += bike.vx;
             bike.y += bike.vy;
             bike.angle += bike.angVel;
-            while (bike.angle > Math.PI) bike.angle -= Math.PI * 2;
-            while (bike.angle < -Math.PI) bike.angle += Math.PI * 2;
+
+            // Dőlésszög korlátozása (Nincs szaltó)
+            if (bike.angle > rotLimit) { bike.angle = rotLimit; bike.angVel = 0; }
+            if (bike.angle < -rotLimit) { bike.angle = -rotLimit; bike.angVel = 0; }
 
             let headRx = 10 * bike.dir; let headRy = -55;
             let headWx = bike.x + Math.cos(bike.angle)*headRx - Math.sin(bike.angle)*headRy;
@@ -369,8 +371,8 @@
             ];
 
             for (let p of collisionPoints) {
-                let wx = bike.x + Math.cos(bike.angle)*p.rx - Math.sin(bike.angle)*p.ry;
-                let wy = bike.y + Math.sin(bike.angle)*p.rx + Math.cos(bike.angle)*p.ry;
+                let wx = bike.x + Math.cos(bike.angle)*p.rx - Math.sin(bike.angle)*p.dy;
+                let wy = bike.y + Math.sin(bike.angle)*p.rx + Math.cos(bike.angle)*p.dy;
 
                 let leftBound = cameraX - 50;
                 if (wx - p.radius < leftBound) { 
@@ -484,45 +486,42 @@
             ctx.beginPath(); ctx.arc(30, 10, 12, 0, Math.PI * 2); ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.lineWidth = 4; ctx.stroke();
             ctx.beginPath(); ctx.arc(30, 10, 8, 0, Math.PI * 2); ctx.strokeStyle = colors.main; ctx.lineWidth = 1; ctx.stroke();
 
-            // --- JAVÍTOTT BRINGA VÁZ ---
             ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 2;
             ctx.beginPath(); 
-            ctx.moveTo(-25, 10); // Hátsó kerék közepe
-            ctx.lineTo(0, 10);   // Hajtómű
-            ctx.lineTo(20, -15); // Kormánycsapágy
-            ctx.lineTo(30, 10);  // Első kerék közepe (VILLA JAVÍTVA)
-            ctx.moveTo(20, -15); // Kormánycsapágy
-            ctx.lineTo(-10, 0);  // Nyeregcső teteje
-            ctx.lineTo(-25, 10); // Hátsó kerék közepe
-            ctx.moveTo(-10, 0);  // Nyeregcső teteje
-            ctx.lineTo(0, 10);   // Hajtómű
+            ctx.moveTo(-25, 10); 
+            ctx.lineTo(0, 10);   
+            ctx.lineTo(20, -15); 
+            ctx.lineTo(30, 10);  
+            ctx.moveTo(20, -15); 
+            ctx.lineTo(-10, 0);  
+            ctx.lineTo(-25, 10); 
+            ctx.moveTo(-10, 0);  
+            ctx.lineTo(0, 10);   
             ctx.stroke();
 
-            // Kormány
             ctx.beginPath(); ctx.moveTo(20, -15); ctx.lineTo(18, -20); ctx.lineTo(22, -22); ctx.stroke();
 
-            // --- NEON ARIFER ---
             ctx.beginPath();
             ctx.strokeStyle = gameState !== STATE_PLAYING ? colors.alt : colors.main; 
             ctx.lineWidth = 4; ctx.shadowBlur = 10; ctx.shadowColor = ctx.strokeStyle;
             
             const hands = { x: 20, y: -22 }; const pedals = { x: 0, y: 10 };   
-            let butt = { x: -12, y: -22 }; let shoulder = { x: 5, y: -45 }; let head = { x: 10, y: -55 };     
+            
+            // Rider dinamika: Butt mozgása a húzás irányától függ
+            let dragX = isDragging ? (dragCurrent.x - dragStart.x) : 0;
+            let dragY = isDragging ? (dragCurrent.y - dragStart.y) : 0;
+            let dragFactorX = Math.max(-1, Math.min(1, dragX / 100));
+            let dragFactorY = Math.max(-1, Math.min(1, dragY / 100));
 
-            if (isDragging && gameState === STATE_PLAYING) {
-                const pullX = dragCurrent.x - dragStart.x; const pullY = dragCurrent.y - dragStart.y;
-                const localPullX = pullX * bike.dir; let pullLen = Math.sqrt(localPullX*localPullX + pullY*pullY);
-                if (pullLen > 0) {
-                    let moveDist = Math.min(pullLen, maxDragDistance);
-                    butt.x += (localPullX/pullLen)*(moveDist*0.12); butt.y += (pullY/pullLen)*(moveDist*0.12);
-                    shoulder.x += (localPullX/pullLen)*(moveDist*0.15); shoulder.y += (pullY/pullLen)*(moveDist*0.15);
-                    head.x += (localPullX/pullLen)*(moveDist*0.15); head.y += (pullY/pullLen)*(moveDist*0.15);
-                }
-            } else if (!bike.grounded && bike.pose === poseStates.AIRBORNE) {
-                butt.x += 10 * bike.tuckFactor; butt.y += 8 * bike.tuckFactor;
-                shoulder.x += 12 * bike.tuckFactor; shoulder.y += 10 * bike.tuckFactor;
-                head.x += 12 * bike.tuckFactor; head.y += 10 * bike.tuckFactor;
-            }
+            let butt = { 
+                x: -12 + (bike.tuckFactor * 8) + (dragFactorX * 10), 
+                y: -22 + (bike.tuckFactor * 5) - (dragFactorY * 5)
+            }; 
+            let shoulder = { 
+                x: 5 + (bike.tuckFactor * 10) + (dragFactorX * 5), 
+                y: -45 + (bike.tuckFactor * 10) - (dragFactorY * 3)
+            }; 
+            let head = { x: shoulder.x + 5, y: shoulder.y - 10 };     
 
             ctx.moveTo(butt.x, butt.y); ctx.lineTo(shoulder.x, shoulder.y); 
             let armMx = (shoulder.x + hands.x) / 2 - 5; let armMy = (shoulder.y + hands.y) / 2 - 8;
