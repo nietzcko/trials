@@ -492,7 +492,8 @@
                                 }
 
                                 bike.vy = 0;
-                                if (p.name === 'rear' || p.name === 'front') bike.vx *= 0.95;
+                                    if (p.name === 'rear' || p.name === 'front') bike.vx *= 0.35;
+                                    if (p.name === 'pedal') bike.vx *= 0.92;
                                 bike.angVel = 0;
                                 bike.targetAirAngle = 0;
                                 bike.airRotateStrength = 0.12;
