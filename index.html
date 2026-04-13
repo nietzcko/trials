@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vonalrajzos Trial Bringa</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: sans-serif;
+        }
+        canvas {
+            background-color: #ffffff;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            border: 2px solid #333;
+            cursor: crosshair;
+        }
+        #instructions {
+            position: absolute;
+            top: 20px;
+            text-align: center;
+            color: #555;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="instructions">
+        <h2>Trial Bringa</h2>
+        <p>Kattints, húzd hátra (csúzli módszer), és engedd el az ugráshoz!</p>
+    </div>
+
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Játékállapot
+        let isDragging = false;
+        let dragStart = { x: 0, y: 0 };
+        let dragCurrent = { x: 0, y: 0 };
+
+        // Bringa objektum (kör alapú fizika a stabil ütközéshez)
+        const bike = {
+            x: 100,
+            y: 400,
+            vx: 0,
+            vy: 0,
+            radius: 20, // A kerékpárunk befoglaló sugara
+            angle: 0,
+            angVel: 0,
+            grounded: false
+        };
+
+        const gravity = 0.4;
+        const bounceFactor = 0.6; // Mennyire pattanjon vissza a falról
+
+        // Pályaelemek (Vízszintes és függőleges téglalapok)
+        const terrain = [
+            { x: 0, y: 550, w: 800, h: 50 },    // Padló
+            { x: 300, y: 450, w: 50, h: 100 },  // Első akadály
+            { x: 500, y: 300, w: 150, h: 20 },  // Lebegő platform
+            { x: 750, y: 0, w: 50, h: 600 },    // Jobb oldali fal
+            { x: 0, y: 0, w: 20, h: 600 }       // Bal oldali fal
+        ];
+
+        // Egér/Érintés események
+        function startDrag(x, y) {
+            if (bike.grounded) {
+                isDragging = true;
+                dragStart = { x, y };
+                dragCurrent = { x, y };
+            }
+        }
+
+        function moveDrag(x, y) {
+            if (isDragging) {
+                dragCurrent = { x, y };
+            }
+        }
+
+        function endDrag() {
+            if (isDragging) {
+                isDragging = false;
+                
+                // Csúzli vektor kiszámítása
+                const dx = dragStart.x - dragCurrent.x;
+                const dy = dragStart.y - dragCurrent.y;
+                
+                // Ha elég nagyot húztunk rajta
+                if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+                    bike.vx = dx * 0.15;
+                    bike.vy = dy * 0.15;
+                    // Ugrásnál fordul is a bringa a vízszintes sebességtől függően
+                    bike.angVel = bike.vx * 0.02;
+                    bike.grounded = false;
+                }
+            }
+        }
+
+        // Eseménykezelők bekötése
+        canvas.addEventListener('mousedown', (e) => startDrag(e.offsetX, e.offsetY));
+        canvas.addEventListener('mousemove', (e) => moveDrag(e.offsetX, e.offsetY));
+        window.addEventListener('mouseup', endDrag);
+
+        // Érintőképernyő támogatás
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            startDrag(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top);
+        });
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            moveDrag(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top);
+        });
+        window.addEventListener('touchend', endDrag);
+
+        // Fizika frissítése
+        function updatePhysics() {
+            if (!bike.grounded) {
+                // Gravitáció
+                bike.vy += gravity;
+                
+                // Pozíció frissítése
+                bike.x += bike.vx;
+                bike.y += bike.vy;
+                bike.angle += bike.angVel;
+
+                // Ütközésvizsgálat (AABB - Kör ütközés)
+                let hitGroundThisFrame = false;
+
+                for (let t of terrain) {
+                    // Legközelebbi pont a téglalapon a kör középpontjához
+                    let closestX = Math.max(t.x, Math.min(bike.x, t.x + t.w));
+                    let closestY = Math.max(t.y, Math.min(bike.y, t.y + t.h));
+
+                    // Távolság a legközelebbi pont és a bringa között
+                    let dx = bike.x - closestX;
+                    let dy = bike.y - closestY;
+                    let distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < bike.radius) {
+                        // Ütközés történt!
+                        // Szétválasztó vektor
+                        let nx = dx / distance;
+                        let ny = dy / distance;
+
+                        // Kitoljuk a bringát az alakzatból
+                        bike.x = closestX + nx * bike.radius;
+                        bike.y = closestY + ny * bike.radius;
+
+                        // Megállapítjuk, hogy vízszintes vagy függőleges falnak ütköztünk-e
+                        if (Math.abs(ny) > Math.abs(nx)) {
+                            // Vízszintes felület (padló vagy plafon)
+                            if (ny < 0) { // Fentről érkeztünk (padló)
+                                bike.vy = 0;
+                                bike.vx = 0; // "Ott marad befékezve"
+                                bike.angVel = 0;
+                                hitGroundThisFrame = true;
+                            } else {
+                                // Plafonba vertük be a fejünk
+                                bike.vy = Math.abs(bike.vy) * 0.5;
+                            }
+                        } else {
+                            // Függőleges felület (fal)
+                            // "Ha függőleges, visszapattan"
+                            bike.vx = -bike.vx * bounceFactor;
+                            bike.angVel *= -0.5; // Pattanáskor kicsit megkavarodik a dőlés
+                        }
+                    }
+                }
+
+                if (hitGroundThisFrame) {
+                    bike.grounded = true;
+                }
+            } else {
+                // "Ha megvan a kontaktpont, akkor a bringás a vízszintes felé dől"
+                // Finoman visszarotáljuk 0 fokra
+                let angleDiff = 0 - bike.angle;
+                bike.angle += angleDiff * 0.1;
+                
+                // Normalizáljuk a szöget, ha nagyon túlpörgött volna
+                if (Math.abs(bike.angle) < 0.01) bike.angle = 0;
+            }
+        }
+
+        // Rajzolás
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Pálya rajzolása
+            ctx.fillStyle = "#666";
+            for (let t of terrain) {
+                ctx.fillRect(t.x, t.y, t.w, t.h);
+            }
+
+            // Csúzli vonal rajzolása (Ha épp húzzuk)
+            if (isDragging) {
+                ctx.beginPath();
+                ctx.moveTo(bike.x, bike.y);
+                const dx = dragStart.x - dragCurrent.x;
+                const dy = dragStart.y - dragCurrent.y;
+                // Vizuális segítség: megmutatjuk merre és mekkorát fog ugrani
+                ctx.lineTo(bike.x + dx, bike.y + dy);
+                ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
+                ctx.lineWidth = 3;
+                ctx.setLineDash([5, 5]);
+                ctx.stroke();
+                ctx.setLineDash([]); // Visszaállítás
+            }
+
+            // Bringa és emberke rajzolása (transzformációkkal a dőlés miatt)
+            ctx.save();
+            ctx.translate(bike.x, bike.y);
+            ctx.rotate(bike.angle);
+
+            ctx.strokeStyle = "#000";
+            ctx.lineWidth = 2;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+
+            // Kerekek (relatív pozíció a középponthoz képest)
+            ctx.beginPath();
+            ctx.arc(-20, 10, 10, 0, Math.PI * 2); // Hátsó kerék
+            ctx.moveTo(30, 10);
+            ctx.arc(20, 10, 10, 0, Math.PI * 2);  // Első kerék
+            ctx.stroke();
+
+            // Bringa váz
+            ctx.beginPath();
+            ctx.moveTo(-20, 10); // Hátsó keréktől...
+            ctx.lineTo(0, 10);   // Pedálokhoz...
+            ctx.lineTo(15, -10); // Kormányhoz...
+            ctx.lineTo(20, 10);  // Első kerékhez...
+            ctx.moveTo(0, 10);   // Pedáloktól...
+            ctx.lineTo(-5, -10); // Üléshez...
+            ctx.lineTo(-20, 10); // Vissza a hátsó kerékhez
+            ctx.stroke();
+
+            // Bringás (Stickman)
+            ctx.beginPath();
+            ctx.strokeStyle = "#1a73e8"; // Kék színű emberke
+            ctx.moveTo(-5, -10); // Fenék az ülésen
+            ctx.lineTo(5, -25);  // Gerinc a vállig
+            ctx.lineTo(15, -10); // Kar a kormányra
+            ctx.moveTo(-5, -10); 
+            ctx.lineTo(0, 10);   // Láb a pedálra
+            ctx.moveTo(5, -25);
+            ctx.arc(8, -32, 5, 0, Math.PI * 2); // Fej
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // Fő játékciklus (Game Loop)
+        function gameLoop() {
+            updatePhysics();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Indítás
+        gameLoop();
+    </script>
+</body>
+</html>
