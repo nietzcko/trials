@@ -3,61 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Végtelen Trial Bringa - Arcade Mód</title>
+    <title>Minimal Trial Bike</title>
     <style>
+        :root {
+            --bg-color: #111115;
+            --platform-body: #1a1a20;
+            --neon-main: #00f3ff;
+            --neon-alt: #ff0055;
+            --neon-goal: #ffd700;
+            --ui-bg: rgba(26, 26, 32, 0.9);
+            --ui-border: rgba(0, 243, 255, 0.4);
+            --text-color: #ffffff;
+        }
+
         body {
             margin: 0;
             padding: 0;
-            background-color: #111; 
+            background-color: var(--bg-color); 
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
             overflow: hidden;
-            font-family: sans-serif;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
             touch-action: none; 
+            color: var(--text-color);
         }
+
         canvas {
-            background-color: #f0f4f8; 
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
             max-width: 100vw;
             max-height: 100vh;
             object-fit: contain;
             cursor: crosshair;
         }
-        #ui {
+
+        #ui-top {
             position: absolute;
-            top: 10px;
+            top: 20px;
             left: 50%;
             transform: translateX(-50%);
-            text-align: center;
             pointer-events: none;
-            width: 100%;
+            width: auto;
             max-width: 600px;
         }
+
+        /* Verziószám / Futam számláló a bal alsó sarokban */
+        #ui-bottom-left {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            pointer-events: none;
+        }
+
         .hud {
             display: inline-block;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 5px 20px;
-            border-radius: 20px;
-            font-weight: bold;
-            color: #333;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            font-size: 1.2rem;
-            margin: 5px;
+            background: var(--ui-bg);
+            border: 1px solid var(--ui-border);
+            padding: 10px 25px;
+            border-radius: 4px;
+            font-weight: 500;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+            font-size: 1.1rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            backdrop-filter: blur(5px);
         }
-        .heart { color: #e74c3c; }
-        #help { font-size: 0.8rem; color: #666; display: block; margin-top: 5px; background: rgba(255,255,255,0.7); display: inline-block; padding: 2px 8px; border-radius: 10px;}
+
+        .hud-small {
+            padding: 6px 15px;
+            font-size: 0.9rem;
+            border-color: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .heart { color: var(--neon-alt); }
+        .score-num { color: var(--neon-goal); font-size: 1.3rem; }
     </style>
 </head>
 <body>
 
-    <div id="ui">
+    <div id="ui-top">
         <div class="hud">
-            <span class="heart">❤</span> <span id="livesDisplay">3</span> | 
-            Szint: <span id="scoreDisplay">0</span>
+            <span class="heart">❤</span> <span id="livesDisplay">3</span> &nbsp;|&nbsp; 
+            SZINT: <span id="scoreDisplay" class="score-num">0</span>
         </div>
-        <br><span id="help">Minden 5. szint után bónusz élet!</span>
+    </div>
+
+    <div id="ui-bottom-left">
+        <div class="hud hud-small" id="generationDisplay">RUN #0</div>
     </div>
 
     <canvas id="gameCanvas" width="600" height="900"></canvas>
@@ -67,6 +101,7 @@
         const ctx = canvas.getContext('2d');
         const scoreDisplay = document.getElementById('scoreDisplay');
         const livesDisplay = document.getElementById('livesDisplay');
+        const generationDisplay = document.getElementById('generationDisplay');
 
         // JÁTÉK ÁLLAPOTOK
         const STATE_PLAYING = 0;
@@ -78,13 +113,28 @@
         let dragStart = { x: 0, y: 0 };
         let dragCurrent = { x: 0, y: 0 };
         
+        // --- ÚJ VÁLTOZÓK A FUTAM SZÁMOLÁSÁHOZ ÉS A LIMITHEZ ---
+        let generationCount = 0; // Futam (Verzió) számláló
+        const maxDragDistance = 220; // MAXIMUM HÚZÁSI TÁVOLSÁG LIMIT (PIXEL)
+
         let score = 0;
         let lives = 3;
         let cameraY = 0;
         let targetCameraY = 0;
         let lastCheckpoint = { x: 300, y: 800 };
+        let pulseGlow = 0; 
+        let bgPulse = 0; // Háttér animációhoz
 
-        // BEÁLLÍTÁSOK
+        // SZÍNEK (CSS változókból)
+        const getCSSVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        const colors = {
+            main: getCSSVar('--neon-main'),
+            alt: getCSSVar('--neon-alt'),
+            goal: getCSSVar('--neon-goal'),
+            platform: getCSSVar('--platform-body'),
+            bg: getCSSVar('--bg-color')
+        };
+
         const jumpPower = 0.045; 
         const gravity = 0.4;
         const bounceFactor = 0.4; 
@@ -98,46 +148,48 @@
         };
 
         let terrain = [];
-        let goal = { x: 0, y: 0, radius: 18 };
+        let goal = { x: 0, y: 0, radius: 20 };
 
         function updateHUD() {
             scoreDisplay.innerText = score;
             livesDisplay.innerText = lives;
         }
 
-        // PÁLYAGENERÁTOR JAVÍTVA
         function generateChunk(startY, endY) {
             const goalPlatform = { 
-                x: 100 + Math.random() * 300, 
+                x: 150 + Math.random() * 300, 
                 y: endY + 20, 
-                w: 100, 
+                w: 120, 
                 h: 20 
             };
             terrain.push(goalPlatform);
             goal.x = goalPlatform.x + goalPlatform.w / 2;
             goal.y = goalPlatform.y - 20;
 
-            // Biztonsági távolság a platformok között (A bringás kb. 80px magas, rászámolunk még)
-            const minGap = 150; 
-            
-            // Az első platform biztonságos távolságban indul a start magasságtól felfelé
-            let currentY = startY - minGap - (Math.random() * 50); 
+            const minGap = 100; 
+            let currentY = startY - minGap - 30; 
             
             while(currentY > endY + minGap) {
-                let pHeight = 20 + Math.random() * 30; // Platform vastagsága
+                let pHeight = 20;
+                let pWidth = 80 + Math.random() * 60; 
+                let pX = 30 + Math.random() * (canvas.width - pWidth - 60);
+
                 terrain.push({
-                    x: 50 + Math.random() * 400,
+                    x: pX,
                     y: currentY,
-                    w: 60 + Math.random() * 80,
+                    w: pWidth,
                     h: pHeight
                 });
                 
-                // A következő lépés = Minimum rés + a platform vastagsága + egy kis random távolság
-                currentY -= (minGap + pHeight + Math.random() * 60);
+                currentY -= (minGap + pHeight + Math.random() * 40);
             }
         }
 
+        // --- ÚJ GENERÁLÁS SZÁMLÁLÁS ---
         function initGame() {
+            generationCount++; // Növeljük a futam számát
+            generationDisplay.innerText = `RUN #${generationCount}`; // Frissítjük a kijelzőt
+            
             score = 0;
             lives = 3;
             cameraY = 0;
@@ -165,19 +217,15 @@
             bike.tuckFactor = 0;
             isDragging = false;
             
-            if (cameraY < targetCameraY - 500) {
-                cameraY = targetCameraY;
-            }
+            targetCameraY = bike.y - 700;
+            cameraY = targetCameraY; 
         }
 
         function triggerCrash() {
             lives--;
             updateHUD();
-            if (lives > 0) {
-                gameState = STATE_CRASHED; 
-            } else {
-                gameState = STATE_GAMEOVER; 
-            }
+            if (lives > 0) gameState = STATE_CRASHED; 
+            else gameState = STATE_GAMEOVER; 
             isDragging = false;
         }
 
@@ -192,15 +240,8 @@
         }
 
         function startDrag(x, y) {
-            if (gameState === STATE_CRASHED) {
-                gameState = STATE_PLAYING;
-                resetToCheckpoint();
-                return;
-            }
-            if (gameState === STATE_GAMEOVER) {
-                initGame();
-                return;
-            }
+            if (gameState === STATE_CRASHED) { gameState = STATE_PLAYING; resetToCheckpoint(); return; }
+            if (gameState === STATE_GAMEOVER) { initGame(); return; }
 
             if (bike.grounded && gameState === STATE_PLAYING) {
                 isDragging = true;
@@ -219,15 +260,27 @@
             }
         }
 
+        // --- ÚJ JAVÍTOTT JUMP CAPPING ---
         function endDrag() {
             if (isDragging && gameState === STATE_PLAYING) {
                 isDragging = false;
-                const aimX = dragStart.x - dragCurrent.x;
-                const aimY = dragStart.y - dragCurrent.y;
+                let aimX = dragStart.x - dragCurrent.x;
+                let aimY = dragStart.y - dragCurrent.y;
+                let aimLen = Math.sqrt(aimX * aimX + aimY * aimY);
+
+                // --- ÚJ LIMIT LOGIKA ---
+                if (aimLen > maxDragDistance) {
+                    // Ha túlhúzta, visszakorlátozzuk a limitre
+                    aimX = (aimX / aimLen) * maxDragDistance;
+                    aimY = (aimY / aimLen) * maxDragDistance;
+                    aimLen = maxDragDistance; // frissítés a dőléshez
+                }
                 
-                if (Math.abs(aimX) > 5 || Math.abs(aimY) > 5) {
+                if (aimLen > 5) {
                     bike.vx = aimX * jumpPower;
                     bike.vy = aimY * jumpPower;
+                    
+                    // Lassú forgás: -0.0003 radián per pixel ugróerő
                     bike.angVel = aimX * -0.0003; 
                     
                     if (bike.angVel > 0.025) bike.angVel = 0.025;
@@ -242,28 +295,21 @@
             }
         }
 
-        canvas.addEventListener('mousedown', (e) => {
-            const pos = getPointerPos(e.clientX, e.clientY);
-            startDrag(pos.x, pos.y);
-        });
-        canvas.addEventListener('mousemove', (e) => {
-            const pos = getPointerPos(e.clientX, e.clientY);
-            moveDrag(pos.x, pos.y);
-        });
+        // Event Listenerek...
+        canvas.addEventListener('mousedown', (e) => { const pos = getPointerPos(e.clientX, e.clientY); startDrag(pos.x, pos.y); });
+        canvas.addEventListener('mousemove', (e) => { const pos = getPointerPos(e.clientX, e.clientY); moveDrag(pos.x, pos.y); });
         window.addEventListener('mouseup', endDrag);
 
-        canvas.addEventListener('touchstart', (e) => {
-            const pos = getPointerPos(e.touches[0].clientX, e.touches[0].clientY);
-            startDrag(pos.x, pos.y);
-        });
-        canvas.addEventListener('touchmove', (e) => {
-            const pos = getPointerPos(e.touches[0].clientX, e.touches[0].clientY);
-            moveDrag(pos.x, pos.y);
-        });
+        canvas.addEventListener('touchstart', (e) => { const pos = getPointerPos(e.touches[0].clientX, e.touches[0].clientY); startDrag(pos.x, pos.y); });
+        canvas.addEventListener('touchmove', (e) => { const pos = getPointerPos(e.touches[0].clientX, e.touches[0].clientY); moveDrag(pos.x, pos.y); });
         window.addEventListener('touchend', endDrag);
 
         function updatePhysics() {
-            cameraY += (targetCameraY - cameraY) * 0.08;
+            targetCameraY = bike.y - 700;
+            cameraY += (targetCameraY - cameraY) * 0.06;
+
+            pulseGlow = (pulseGlow + 0.05) % (Math.PI * 2);
+            bgPulse = (bgPulse + 0.002) % (Math.PI * 2);
 
             if (gameState !== STATE_PLAYING) return;
 
@@ -279,9 +325,9 @@
                 let localPullX = pullX * bike.dir; 
                 let pullLen = Math.sqrt(localPullX*localPullX + pullY*pullY);
                 
-                let tiltAmount = Math.min(pullLen, 150) / 150; 
+                // --- LIMIT LOGIKA A DŐLÉSHEZ ---
+                let tiltAmount = Math.min(pullLen, maxDragDistance) / maxDragDistance; 
                 let targetAngle = -0.5 * tiltAmount * bike.dir; 
-                
                 bike.angle += (targetAngle - bike.angle) * 0.15;
             }
 
@@ -302,10 +348,7 @@
                 let closestY = Math.max(t.y, Math.min(headWy, t.y + t.h));
                 let dx = headWx - closestX;
                 let dy = headWy - closestY;
-                if (Math.sqrt(dx*dx + dy*dy) < 12) { 
-                    triggerCrash(); 
-                    return; 
-                }
+                if (Math.sqrt(dx*dx + dy*dy) < 12) { triggerCrash(); return; }
             }
 
             let hitGroundThisFrame = false;
@@ -320,18 +363,8 @@
                 let wx = bike.x + Math.cos(bike.angle)*p.rx - Math.sin(bike.angle)*p.ry;
                 let wy = bike.y + Math.sin(bike.angle)*p.rx + Math.cos(bike.angle)*p.ry;
 
-                if (wx - p.radius < 0) { 
-                    bike.x += Math.abs(wx - p.radius);
-                    bike.vx = Math.abs(bike.vx) * bounceFactor;
-                    bike.angVel *= -0.3;
-                    wx = p.radius; 
-                }
-                if (wx + p.radius > canvas.width) { 
-                    bike.x -= Math.abs((wx + p.radius) - canvas.width);
-                    bike.vx = -Math.abs(bike.vx) * bounceFactor;
-                    bike.angVel *= -0.3;
-                    wx = canvas.width - p.radius;
-                }
+                if (wx - p.radius < 0) { bike.x += Math.abs(wx - p.radius); bike.vx = Math.abs(bike.vx) * bounceFactor; bike.angVel *= -0.3; wx = p.radius; }
+                if (wx + p.radius > canvas.width) { bike.x -= Math.abs((wx + p.radius) - canvas.width); bike.vx = -Math.abs(bike.vx) * bounceFactor; bike.angVel *= -0.3; wx = canvas.width - p.radius; }
 
                 for (let t of terrain) {
                     let closestX = Math.max(t.x, Math.min(wx, t.x + t.w));
@@ -350,17 +383,9 @@
                         bike.y += ny * penetration;
 
                         if (Math.abs(ny) > Math.abs(nx)) {
-                            if (ny < 0) { 
-                                bike.vy = 0; bike.vx = 0; bike.angVel = 0;
-                                hitGroundThisFrame = true;
-                                bike.pose = poseStates.GROUNDED; 
-                            } else { 
-                                bike.vy = Math.abs(bike.vy) * 0.5;
-                            }
-                        } else { 
-                            bike.vx = -bike.vx * bounceFactor;
-                            bike.angVel *= -0.3; 
-                        }
+                            if (ny < 0) { bike.vy = 0; bike.vx = 0; bike.angVel = 0; hitGroundThisFrame = true; bike.pose = poseStates.GROUNDED; }
+                            else bike.vy = Math.abs(bike.vy) * 0.5;
+                        } else { bike.vx = -bike.vx * bounceFactor; bike.angVel *= -0.3; }
                     }
                 }
             }
@@ -368,204 +393,201 @@
             bike.grounded = hitGroundThisFrame;
 
             if (bike.grounded && !isDragging) {
-                if (bike.angle * bike.dir > 0) {
-                    let targetAngle = -0.1 * bike.dir; 
-                    bike.angle += (targetAngle - bike.angle) * 0.1;
-                }
+                if (bike.angle * bike.dir > 0) { let targetAngle = -0.1 * bike.dir; bike.angle += (targetAngle - bike.angle) * 0.1; }
                 bike.tuckFactor = Math.max(0, bike.tuckFactor - 0.1); 
             }
             
             let distToGoal = Math.sqrt(Math.pow(bike.x - goal.x, 2) + Math.pow(bike.y - goal.y, 2));
             if (distToGoal < bike.radius + goal.radius) {
                 score++;
-                
-                if (score % 5 === 0) {
-                    lives++;
-                }
+                if (score % 5 === 0) lives++;
                 updateHUD();
-                
                 lastCheckpoint = { x: goal.x, y: goal.y - 20 };
                 let newEndY = goal.y - 800; 
                 generateChunk(goal.y, newEndY);
-                targetCameraY = goal.y - 750;
                 terrain = terrain.filter(t => t.y < cameraY + 1500);
             }
 
-            if (bike.y > cameraY + canvas.height + 50) {
-                triggerCrash();
-            }
+            if (bike.y > cameraY + canvas.height + 150) triggerCrash();
         }
 
         function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // SZÉP, MINIMALISTA PULZÁLÓ HÁTTÉR
+            ctx.fillStyle = colors.bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            let centerPulse = Math.sin(bgPulse) * 0.03 + 0.03;
+            ctx.fillStyle = `rgba(255, 255, 255, ${centerPulse})`;
+            ctx.fillRect(15, 0, canvas.width - 30, canvas.height); // Finom fény középen
 
             ctx.save();
             ctx.translate(0, -cameraY);
 
-            ctx.fillStyle = "#88929b";
+            // Végtelen falak vizuálisan letisztultan
+            ctx.fillStyle = "rgba(255, 255, 255, 0.03)";
             ctx.fillRect(0, cameraY - 100, 15, canvas.height + 200); 
             ctx.fillRect(canvas.width - 15, cameraY - 100, 15, canvas.height + 200); 
 
-            ctx.fillStyle = "#4a5568";
-            for (let t of terrain) ctx.fillRect(t.x, t.y, t.w, t.h);
-
-            ctx.beginPath();
-            ctx.arc(goal.x, goal.y, goal.radius, 0, Math.PI * 2);
-            ctx.fillStyle = "#FFD700"; 
-            ctx.fill();
-            ctx.strokeStyle = "#B8860B";
-            ctx.lineWidth = 4;
-            ctx.stroke();
-
-            if (isDragging && gameState === STATE_PLAYING) {
-                const aimX = dragStart.x - dragCurrent.x;
-                const aimY = dragStart.y - dragCurrent.y;
-                const pullX = dragCurrent.x - dragStart.x;
-                const pullY = dragCurrent.y - dragStart.y;
-
+            // DIZÁJN: Minimalista platformok éles neon highlighttal
+            ctx.lineJoin = "miter";
+            ctx.lineCap = "butt";
+            for (let t of terrain) {
+                // Alap sötét test
+                ctx.fillStyle = colors.platform;
+                ctx.fillRect(t.x, t.y, t.w, t.h);
+                // Felső él (Lézer vonal)
                 ctx.beginPath();
-                ctx.moveTo(bike.x, bike.y);
-                ctx.lineTo(bike.x + aimX, bike.y + aimY);
-                ctx.strokeStyle = "rgba(0, 150, 0, 0.6)";
+                ctx.moveTo(t.x, t.y + 1);
+                ctx.lineTo(t.x + t.w, t.y + 1);
                 ctx.lineWidth = 2;
-                ctx.setLineDash([5, 5]);
-                ctx.stroke();
-                
-                ctx.beginPath();
-                ctx.moveTo(bike.x, bike.y);
-                ctx.lineTo(bike.x + pullX, bike.y + pullY);
-                ctx.strokeStyle = "rgba(255, 0, 0, 0.6)";
-                ctx.lineWidth = 4;
-                ctx.setLineDash([]);
+                // A célplatform arany, a többi cián
+                ctx.strokeStyle = t.w === 120 ? colors.goal : colors.main; 
                 ctx.stroke();
             }
 
+            // LÜKTETŐ PLAZMA CÉL
+            ctx.beginPath();
+            ctx.arc(goal.x, goal.y, goal.radius, 0, Math.PI * 2);
+            let glow = 10 + Math.sin(pulseGlow) * 4;
+            ctx.fillStyle = "rgba(255, 215, 0, 0.8)"; 
+            ctx.fill();
+            ctx.shadowBlur = glow * 2;
+            ctx.shadowColor = colors.goal;
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.shadowBlur = 0; // Reset árnyék
+
+            // --- ÚJ LIMIT-HEZ IGAZÍTOTT CÉLZÓ VONALAK ---
+            if (isDragging && gameState === STATE_PLAYING) {
+                let aimX = dragStart.x - dragCurrent.x;
+                let aimY = dragStart.y - dragCurrent.y;
+                let dragX = dragCurrent.x - dragStart.x;
+                let dragY = dragCurrent.y - dragStart.y;
+                let aimLen = Math.sqrt(aimX * aimX + aimY * aimY);
+
+                // --- ÚJ LIMIT LOGIKA A MEGJELENÍTÉSHEZ IS ---
+                if (aimLen > maxDragDistance) {
+                    aimX = (aimX / aimLen) * maxDragDistance;
+                    aimY = (aimY / aimLen) * maxDragDistance;
+                    dragX = (dragX / aimLen) * maxDragDistance;
+                    dragY = (dragY / aimLen) * maxDragDistance;
+                }
+
+                // Szaggatott zöld: Ugrás iránya
+                ctx.beginPath();
+                ctx.moveTo(bike.x, bike.y);
+                ctx.lineTo(bike.x + aimX, bike.y + aimY);
+                ctx.strokeStyle = "rgba(0, 255, 0, 0.5)";
+                ctx.lineWidth = 2;
+                ctx.setLineDash([8, 6]);
+                ctx.stroke();
+                
+                // Piros folytonos: Csúzli gumi (A maximum limitet jelző végponttal)
+                ctx.setLineDash([]);
+                ctx.beginPath();
+                ctx.moveTo(bike.x, bike.y);
+                ctx.lineTo(bike.x + dragX, bike.y + dragY);
+                ctx.strokeStyle = "rgba(255, 0, 85, 0.6)";
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                // Kis kereszt a végére, ha elérte a limitet
+                if (aimLen >= maxDragDistance) {
+                    ctx.beginPath(); ctx.fillStyle = colors.alt;
+                    ctx.arc(bike.x + dragX, bike.y + dragY, 4, 0, Math.PI * 2); ctx.fill();
+                }
+            }
+
+            // --- BRINGA RAJZOLÁS ---
             ctx.save();
             ctx.translate(bike.x, bike.y);
             ctx.rotate(bike.angle);
             ctx.scale(bike.dir, 1); 
 
-            ctx.lineCap = "round";
-            ctx.lineJoin = "round";
+            ctx.lineCap = "square"; ctx.lineJoin = "miter";
 
-            ctx.strokeStyle = "#222";
-            ctx.lineWidth = 5;
-            ctx.beginPath();
-            ctx.arc(-25, 10, 12, 0, Math.PI * 2); 
-            ctx.moveTo(42, 10);
-            ctx.arc(30, 10, 12, 0, Math.PI * 2);  
-            ctx.stroke();
-
-            ctx.strokeStyle = "#111";
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(-25, 10); 
-            ctx.lineTo(0, 10);   
-            ctx.lineTo(20, -15); 
-            ctx.lineTo(25, 10);  
-            ctx.moveTo(20, -15); 
-            ctx.lineTo(-10, 0);  
-            ctx.lineTo(-25, 10); 
-            ctx.moveTo(-10, 0);  
-            ctx.lineTo(0, 10);   
-            ctx.moveTo(-8, 14);
-            ctx.lineTo(8, 14);
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.moveTo(20, -15);
-            ctx.lineTo(18, -20); 
-            ctx.lineTo(22, -22); 
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.strokeStyle = gameState !== STATE_PLAYING ? "#e74c3c" : "#1a73e8"; 
-            ctx.lineWidth = 4; 
+            // HUBLESS KEREKEK
+            ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.lineWidth = 4;
             
-            const hands = { x: 20, y: -22 };  
-            const pedals = { x: 0, y: 10 };   
+            // Hátsó
+            ctx.beginPath(); ctx.arc(-25, 10, 12, 0, Math.PI * 2); ctx.stroke();
+            ctx.beginPath(); ctx.arc(-25, 10, 8, 0, Math.PI * 2); ctx.strokeStyle = colors.main; ctx.lineWidth = 1; ctx.stroke();
             
-            let butt = { x: -12, y: -22 };   
-            let shoulder = { x: 5, y: -45 }; 
-            let head = { x: 10, y: -55 };     
+            // Első
+            ctx.beginPath(); ctx.arc(30, 10, 12, 0, Math.PI * 2); ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.lineWidth = 4; ctx.stroke();
+            ctx.beginPath(); ctx.arc(30, 10, 8, 0, Math.PI * 2); ctx.strokeStyle = colors.main; ctx.lineWidth = 1; ctx.stroke();
+
+            // Váz
+            ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-25, 10); ctx.lineTo(0, 10); ctx.lineTo(20, -15); ctx.lineTo(25, 10); 
+            ctx.moveTo(20, -15); ctx.lineTo(-10, 0); ctx.lineTo(-25, 10); ctx.moveTo(-10, 0); ctx.lineTo(0, 10);
+            ctx.stroke();
+
+            ctx.beginPath(); ctx.moveTo(20, -15); ctx.lineTo(18, -20); ctx.lineTo(22, -22); ctx.stroke();
+
+            // --- NEON ARIFER ---
+            ctx.beginPath();
+            // Piros ha meghal, világító ciánkék ha él
+            ctx.strokeStyle = gameState !== STATE_PLAYING ? colors.alt : colors.main; 
+            ctx.lineWidth = 4; ctx.shadowBlur = 10; ctx.shadowColor = ctx.strokeStyle;
+            
+            const hands = { x: 20, y: -22 }; const pedals = { x: 0, y: 10 };   
+            
+            let butt = { x: -12, y: -22 }; let shoulder = { x: 5, y: -45 }; let head = { x: 10, y: -55 };     
 
             if (isDragging && gameState === STATE_PLAYING) {
                 const pullX = dragCurrent.x - dragStart.x;
                 const pullY = dragCurrent.y - dragStart.y;
                 const localPullX = pullX * bike.dir;
-                
                 let pullLen = Math.sqrt(localPullX*localPullX + pullY*pullY);
                 let moveX = 0, moveY = 0;
                 
                 if (pullLen > 0) {
-                    moveX = (localPullX / pullLen) * Math.min(pullLen * 0.15, 20);
-                    moveY = (pullY / pullLen) * Math.min(pullLen * 0.15, 20);
+                    // Itt is capped a mozgás
+                    let moveDist = Math.min(pullLen, maxDragDistance);
+                    moveX = (localPullX / pullLen) * (moveDist * 0.15);
+                    moveY = (pullY / pullLen) * (moveDist * 0.15);
                 }
 
-                butt.x += moveX * 0.8;
-                butt.y += moveY * 0.8;
-                shoulder.x += moveX;
-                shoulder.y += moveY;
-                head.x += moveX;
-                head.y += moveY;
+                butt.x += moveX * 0.8; butt.y += moveY * 0.8;
+                shoulder.x += moveX; shoulder.y += moveY; head.x += moveX; head.y += moveY;
 
             } else if (!bike.grounded && bike.pose === poseStates.AIRBORNE) {
-                butt.x += 10 * bike.tuckFactor;
-                butt.y += 8 * bike.tuckFactor;
-                shoulder.x += 12 * bike.tuckFactor;
-                shoulder.y += 10 * bike.tuckFactor;
-                head.x += 12 * bike.tuckFactor;
-                head.y += 10 * bike.tuckFactor;
+                butt.x += 10 * bike.tuckFactor; butt.y += 8 * bike.tuckFactor;
+                shoulder.x += 12 * bike.tuckFactor; shoulder.y += 10 * bike.tuckFactor;
+                head.x += 12 * bike.tuckFactor; head.y += 10 * bike.tuckFactor;
             }
 
-            ctx.moveTo(butt.x, butt.y); 
-            ctx.lineTo(shoulder.x, shoulder.y); 
+            ctx.moveTo(butt.x, butt.y); ctx.lineTo(shoulder.x, shoulder.y); 
             
-            let armMx = (shoulder.x + hands.x) / 2 - 5;
-            let armMy = (shoulder.y + hands.y) / 2 - 8;
-            ctx.moveTo(shoulder.x, shoulder.y);
-            ctx.lineTo(armMx, armMy);
-            ctx.lineTo(hands.x, hands.y);
+            let armMx = (shoulder.x + hands.x) / 2 - 5; let armMy = (shoulder.y + hands.y) / 2 - 8;
+            ctx.moveTo(shoulder.x, shoulder.y); ctx.lineTo(armMx, armMy); ctx.lineTo(hands.x, hands.y);
             
-            let legMx = (butt.x + pedals.x) / 2 + 12;
-            let legMy = (butt.y + pedals.y) / 2 - 4;
-            ctx.moveTo(butt.x, butt.y);
-            ctx.lineTo(legMx, legMy);
-            ctx.lineTo(pedals.x, pedals.y);
+            let legMx = (butt.x + pedals.x) / 2 + 12; let legMy = (butt.y + pedals.y) / 2 - 4;
+            ctx.moveTo(butt.x, butt.y); ctx.lineTo(legMx, legMy); ctx.lineTo(pedals.x, pedals.y);
             
             ctx.stroke();
 
-            ctx.beginPath();
-            ctx.arc(head.x, head.y, 8, 0, Math.PI * 2); 
-            ctx.fillStyle = gameState !== STATE_PLAYING ? "#e74c3c" : "#1a73e8";
-            ctx.fill();
-            ctx.stroke();
+            ctx.beginPath(); ctx.arc(head.x, head.y, 8, 0, Math.PI * 2); 
+            ctx.fillStyle = ctx.strokeStyle; ctx.fill();
 
-            ctx.restore();
+            ctx.shadowBlur = 0; ctx.restore();
             ctx.restore(); 
 
+            // --- OVERLAY SZÖVEGEK ---
             if (gameState === STATE_CRASHED) {
-                ctx.fillStyle = "rgba(231, 76, 60, 0.3)"; 
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = "#fff";
-                ctx.font = "bold 40px sans-serif";
-                ctx.textAlign = "center";
+                ctx.fillStyle = "rgba(0, 0, 0, 0.4)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = "#fff"; ctx.font = "bold 40px sans-serif"; ctx.textAlign = "center";
                 ctx.fillText("BUKTÁL!", canvas.width / 2, canvas.height / 2 - 20);
-                ctx.font = "20px sans-serif";
-                ctx.fillText("Kattints a folytatáshoz (-1 élet)", canvas.width / 2, canvas.height / 2 + 20);
+                ctx.font = "18px sans-serif"; ctx.fillText("Kattints a folytatáshoz (-1 élet)", canvas.width / 2, canvas.height / 2 + 20);
             } else if (gameState === STATE_GAMEOVER) {
-                ctx.fillStyle = "rgba(0, 0, 0, 0.8)"; 
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = "#fff";
-                ctx.font = "bold 50px sans-serif";
-                ctx.textAlign = "center";
+                ctx.fillStyle = "rgba(0, 0, 0, 0.9)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = colors.alt; ctx.font = "bold 50px sans-serif"; ctx.textAlign = "center";
                 ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 40);
-                ctx.font = "24px sans-serif";
-                ctx.fillStyle = "#f1c40f";
-                ctx.fillText(`Elért Szint: ${score}`, canvas.width / 2, canvas.height / 2 + 10);
-                ctx.fillStyle = "#fff";
-                ctx.font = "20px sans-serif";
-                ctx.fillText("Kattints az újrakezdéshez!", canvas.width / 2, canvas.height / 2 + 50);
+                ctx.font = "24px sans-serif"; ctx.fillStyle = colors.goal; ctx.fillText(`ELÉRT SZINT: ${score}`, canvas.width / 2, canvas.height / 2 + 10);
+                ctx.fillStyle = "#fff"; ctx.font = "16px sans-serif"; ctx.fillText("Kattints bárhova az újrakezdéshez!", canvas.width / 2, canvas.height / 2 + 60);
             }
         }
 
