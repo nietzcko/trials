@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Trial - Hardcore Survival</title>
+    <title>Neon Trial - Vertical Survival</title>
     <style>
         :root {
             --bg-color: #0b0c10;
@@ -143,7 +143,7 @@
             x: 150, y: 500, vx: 0, vy: 0, radius: 15, 
             angle: 0, angVel: 0, grounded: false,
             pose: poseStates.GROUNDED, tuckFactor: 0,
-            dir: 1 
+            dir: 1 // Ezt rögzítettük, sosem lesz -1!
         };
 
         let terrain = [];
@@ -152,64 +152,65 @@
             scoreDisplay.innerText = score;
         }
 
-        // --- HARDCORE GENERÁTOR (Kisebb platformok) ---
         function generateObstacle() {
             let gapX = 70 + Math.random() * 80; 
             let startX = genX + gapX;
             
             let type = Math.floor(Math.random() * 6); 
             
-            if (genY < 300) type = Math.max(type, 3); 
-            if (genY > 700) type = Math.min(type, 2); 
+            // Felső és alsó határok, hogy ne menjünk ki a világból
+            if (genY < 250) type = Math.max(type, 3); // Lefelé
+            if (genY > 750) type = Math.min(type, 2); // Felfelé
 
-            if (type === 0) { // Sima vízszintes (Akár 30px kicsi is lehet!)
-                let w = 30 + Math.random() * 90; 
-                let y = genY + (Math.random() * 80 - 40);
+            if (type === 0) { // Sima vízszintes platform
+                let w = 30 + Math.random() * 80; 
+                // NAGYOBB UGRÁSOK: Akár 140 pixel fel, 120 pixel le
+                let y = genY + (Math.random() * 260 - 140);
                 terrain.push({type: 'rect', x: startX, y: y, w: w, h: 30, landed: false});
                 genX = startX + w;
                 genY = y;
             } 
-            else if (type === 1) { // Kör 
-                let r = 20 + Math.random() * 35; // Sokkal kisebb görbületek
-                let y = genY + (Math.random() * 60 - 30);
+            else if (type === 1) { // Kör (Gömbölyű)
+                let r = 20 + Math.random() * 30; 
+                let y = genY + (Math.random() * 200 - 100);
                 terrain.push({type: 'circle', x: startX + r, y: y, r: r, landed: false});
                 genX = startX + r * 2;
                 genY = y - r; 
             } 
-            else if (type === 2) { // Lépcső Fel
+            else if (type === 2) { // Lépcső Fel (Meredekebb)
                 let currX = startX;
-                let currY = genY + 20; 
-                let stepW = 30 + Math.random() * 25; // Keskenyebb fokok
+                let currY = genY; 
+                let stepW = 30 + Math.random() * 20; 
                 for(let i=0; i<3; i++) {
                     terrain.push({type: 'rect', x: currX, y: currY, w: stepW, h: 40, landed: false});
-                    currX += stepW;
-                    currY -= 35;
+                    currX += stepW + 10; // Kis hézag a lépcsők között
+                    currY -= (40 + Math.random() * 20); // Magasabb fokok
                 }
                 genX = currX;
-                genY = currY + 35;
+                genY = currY + 40;
             } 
-            else if (type === 3) { // Lépcső Le
+            else if (type === 3) { // Lépcső Le (Meredekebb)
                 let currX = startX;
-                let currY = genY - 20; 
-                let stepW = 30 + Math.random() * 25;
+                let currY = genY; 
+                let stepW = 30 + Math.random() * 20;
                 for(let i=0; i<3; i++) {
                     terrain.push({type: 'rect', x: currX, y: currY, w: stepW, h: 40, landed: false});
-                    currX += stepW;
-                    currY += 35;
+                    currX += stepW + 10;
+                    currY += (40 + Math.random() * 20);
                 }
                 genX = currX;
-                genY = currY - 35;
+                genY = currY - 40;
             } 
             else if (type === 4) { // Döntött Rampa (Felfelé)
-                let w = 80 + Math.random() * 60; // Rövidebb ugratók
-                let h = 25; let angle = -0.35; 
+                let w = 80 + Math.random() * 50; 
+                let h = 25; let angle = -0.45; // Meredekebb
                 terrain.push({type: 'slope', x: startX, y: genY, w: w, h: h, angle: angle, landed: false});
                 genX = startX + w * Math.cos(angle);
                 genY = genY + w * Math.sin(angle);
             } 
             else if (type === 5) { // Döntött Rampa (Lefelé)
-                let w = 80 + Math.random() * 60; 
-                let h = 25; let angle = 0.35; 
+                let w = 80 + Math.random() * 50; 
+                let h = 25; let angle = 0.45; 
                 terrain.push({type: 'slope', x: startX, y: genY, w: w, h: h, angle: angle, landed: false});
                 genX = startX + w * Math.cos(angle);
                 genY = genY + w * Math.sin(angle);
@@ -232,6 +233,7 @@
             
             bike.x = 150; bike.y = 550; bike.vx = 0; bike.vy = 0; bike.angle = 0; bike.angVel = 0;
             bike.pose = poseStates.GROUNDED; bike.grounded = true; bike.tuckFactor = 0;
+            // Dir eltávolítva a reszetelésből, hogy mindig 1 maradjon
             isDragging = false;
             
             targetCameraX = bike.x - 120;
@@ -264,8 +266,7 @@
         function moveDrag(x, y) {
             if (isDragging && gameState === STATE_PLAYING) {
                 dragCurrent = { x, y };
-                const pullX = dragCurrent.x - dragStart.x;
-                if (pullX < -10) bike.dir = 1; else if (pullX > 10) bike.dir = -1; 
+                // A forgatás logikáját eltávolítottuk, a bringa mindig jobbra néz!
             }
         }
 
@@ -348,6 +349,7 @@
         }
 
         function updatePhysics() {
+            // A kamera követi a mozgást
             targetCameraX = bike.x - 120; 
             targetCameraY = bike.y - 650; 
             cameraX += (targetCameraX - cameraX) * 0.08;
@@ -368,6 +370,7 @@
                 bike.tuckFactor = Math.min(1, bike.tuckFactor + 0.05);
             }
 
+            // Hátradőlés húzás közben (Már csak a rögzített irányba működik)
             if (isDragging && bike.grounded) {
                 const pullX = dragCurrent.x - dragStart.x;
                 const pullY = dragCurrent.y - dragStart.y;
@@ -404,6 +407,7 @@
                 let wx = bike.x + Math.cos(bike.angle)*p.rx - Math.sin(bike.angle)*p.ry;
                 let wy = bike.y + Math.sin(bike.angle)*p.rx + Math.cos(bike.angle)*p.ry;
 
+                // Láthatatlan fal a kamera szélén, de engedjük a hátrálást egy picit jobban
                 let leftBound = cameraX - 50;
                 if (wx - p.radius < leftBound) { 
                     bike.x += Math.abs(wx - p.radius - leftBound); 
