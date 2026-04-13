@@ -118,7 +118,8 @@
         const AIR_ROTATE_MAX = -Math.PI / 4;
         const AIR_ROTATE_MIN = -0.08;
         const GROUND_ANGLE_LIMIT = 0.55;
-        const ONE_WHEEL_DROOP = 0.12;
+        const ONE_WHEEL_POP = 0.22;
+        const ONE_WHEEL_DROP = 0.18;
 
         let bike = {
             x: 150,
@@ -132,7 +133,6 @@
             pose: poseStates.GROUNDED,
             tuckFactor: 0,
             dir: 1,
-
             targetAirAngle: 0,
             airRotateStrength: 0.12,
             airRotateBlend: 0,
@@ -293,7 +293,6 @@
 
                     const pullRatio = Math.min(1, aimLen / maxDragDistance);
                     const horizontalRatio = Math.min(1, Math.abs(aimX) / maxDragDistance);
-
                     const naturalTurn = 0.35 * horizontalRatio + 0.65 * pullRatio;
                     const easedTurn = 1 - Math.pow(1 - naturalTurn, 2);
 
@@ -513,10 +512,10 @@
                     bike.groundAngle = Math.atan2(dy, dx);
                 } else if (rearContact) {
                     const surfaceAngle = Math.atan2(rearContact.ny, rearContact.nx) + Math.PI / 2;
-                    bike.groundAngle = surfaceAngle - ONE_WHEEL_DROOP;
+                    bike.groundAngle = surfaceAngle - ONE_WHEEL_POP;
                 } else if (frontContact) {
                     const surfaceAngle = Math.atan2(frontContact.ny, frontContact.nx) + Math.PI / 2;
-                    bike.groundAngle = surfaceAngle + ONE_WHEEL_DROOP;
+                    bike.groundAngle = surfaceAngle - ONE_WHEEL_DROP;
                 }
 
                 bike.groundAngle = clamp(bike.groundAngle, -GROUND_ANGLE_LIMIT, GROUND_ANGLE_LIMIT);
