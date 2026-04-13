@@ -70,8 +70,8 @@
 
         // JÁTÉK ÁLLAPOTOK
         const STATE_PLAYING = 0;
-        const STATE_CRASHED = 1;  // Fejbeverés vagy leesés, vár a kattintásra
-        const STATE_GAMEOVER = 2; // Nincs több élet
+        const STATE_CRASHED = 1;  
+        const STATE_GAMEOVER = 2; 
 
         let gameState = STATE_PLAYING;
         let isDragging = false;
@@ -105,6 +105,7 @@
             livesDisplay.innerText = lives;
         }
 
+        // PÁLYAGENERÁTOR JAVÍTVA
         function generateChunk(startY, endY) {
             const goalPlatform = { 
                 x: 100 + Math.random() * 300, 
@@ -116,19 +117,26 @@
             goal.x = goalPlatform.x + goalPlatform.w / 2;
             goal.y = goalPlatform.y - 20;
 
-            let currentY = startY - 150;
-            while(currentY > endY + 150) {
+            // Biztonsági távolság a platformok között (A bringás kb. 80px magas, rászámolunk még)
+            const minGap = 150; 
+            
+            // Az első platform biztonságos távolságban indul a start magasságtól felfelé
+            let currentY = startY - minGap - (Math.random() * 50); 
+            
+            while(currentY > endY + minGap) {
+                let pHeight = 20 + Math.random() * 30; // Platform vastagsága
                 terrain.push({
                     x: 50 + Math.random() * 400,
                     y: currentY,
                     w: 60 + Math.random() * 80,
-                    h: 20 + Math.random() * 30
+                    h: pHeight
                 });
-                currentY -= (100 + Math.random() * 80);
+                
+                // A következő lépés = Minimum rés + a platform vastagsága + egy kis random távolság
+                currentY -= (minGap + pHeight + Math.random() * 60);
             }
         }
 
-        // Teljes nullázás (Game Over után)
         function initGame() {
             score = 0;
             lives = 3;
@@ -137,7 +145,7 @@
             terrain = [];
             updateHUD();
             
-            terrain.push({ x: 0, y: 850, w: 600, h: 50 }); // Padló
+            terrain.push({ x: 0, y: 850, w: 600, h: 50 }); 
             
             generateChunk(850, 150);
             lastCheckpoint = { x: 300, y: 800 };
@@ -145,7 +153,6 @@
             resetToCheckpoint();
         }
 
-        // Vissza a Checkponthoz (Életvesztés után)
         function resetToCheckpoint() {
             bike.x = lastCheckpoint.x;
             bike.y = lastCheckpoint.y;
@@ -157,20 +164,19 @@
             bike.grounded = true;
             bike.tuckFactor = 0;
             isDragging = false;
-            // Ha leesett a kamera is alá, visszahúzzuk
+            
             if (cameraY < targetCameraY - 500) {
                 cameraY = targetCameraY;
             }
         }
 
-        // Halál logika (fejbeverés vagy szakadék)
         function triggerCrash() {
             lives--;
             updateHUD();
             if (lives > 0) {
-                gameState = STATE_CRASHED; // Freeze frame
+                gameState = STATE_CRASHED; 
             } else {
-                gameState = STATE_GAMEOVER; // Vége
+                gameState = STATE_GAMEOVER; 
             }
             isDragging = false;
         }
@@ -186,7 +192,6 @@
         }
 
         function startDrag(x, y) {
-            // UI Kattintások kezelése halál esetén
             if (gameState === STATE_CRASHED) {
                 gameState = STATE_PLAYING;
                 resetToCheckpoint();
@@ -197,7 +202,6 @@
                 return;
             }
 
-            // Normál játékmenet
             if (bike.grounded && gameState === STATE_PLAYING) {
                 isDragging = true;
                 dragStart = { x, y };
@@ -259,10 +263,8 @@
         window.addEventListener('touchend', endDrag);
 
         function updatePhysics() {
-            // Finom kamera követés (mindig megy, halálkor is picit csúszik)
             cameraY += (targetCameraY - cameraY) * 0.08;
 
-            // HA MEGHALTUNK, MEGÁLL A FIZIKA (Freeze Frame)
             if (gameState !== STATE_PLAYING) return;
 
             bike.vy += gravity;
@@ -290,7 +292,6 @@
             while (bike.angle > Math.PI) bike.angle -= Math.PI * 2;
             while (bike.angle < -Math.PI) bike.angle += Math.PI * 2;
 
-            // --- FEJ ÜTKÖZÉS (HALÁL) ---
             let headRx = 10 * bike.dir; 
             let headRy = -55;
             let headWx = bike.x + Math.cos(bike.angle)*headRx - Math.sin(bike.angle)*headRy;
@@ -302,7 +303,7 @@
                 let dx = headWx - closestX;
                 let dy = headWy - closestY;
                 if (Math.sqrt(dx*dx + dy*dy) < 12) { 
-                    triggerCrash(); // MEGFIZETETT HIBÁZÁS
+                    triggerCrash(); 
                     return; 
                 }
             }
@@ -374,12 +375,10 @@
                 bike.tuckFactor = Math.max(0, bike.tuckFactor - 0.1); 
             }
             
-            // --- CHECKPOINT / SZINTLÉPÉS LOGIKA ---
             let distToGoal = Math.sqrt(Math.pow(bike.x - goal.x, 2) + Math.pow(bike.y - goal.y, 2));
             if (distToGoal < bike.radius + goal.radius) {
                 score++;
                 
-                // +1 Élet minden 5. pályán!
                 if (score % 5 === 0) {
                     lives++;
                 }
@@ -392,7 +391,6 @@
                 terrain = terrain.filter(t => t.y < cameraY + 1500);
             }
 
-            // Leesés halál (Ha kiesel a képből lefelé)
             if (bike.y > cameraY + canvas.height + 50) {
                 triggerCrash();
             }
@@ -442,7 +440,6 @@
                 ctx.stroke();
             }
 
-            // --- BRINGA ---
             ctx.save();
             ctx.translate(bike.x, bike.y);
             ctx.rotate(bike.angle);
@@ -481,9 +478,7 @@
             ctx.lineTo(22, -22); 
             ctx.stroke();
 
-            // --- ARIFER ---
             ctx.beginPath();
-            // Pirosra vált a ruhája, ha beveri a fejét!
             ctx.strokeStyle = gameState !== STATE_PLAYING ? "#e74c3c" : "#1a73e8"; 
             ctx.lineWidth = 4; 
             
@@ -547,11 +542,10 @@
             ctx.stroke();
 
             ctx.restore();
-            ctx.restore(); // Kamera visszaállítása
+            ctx.restore(); 
 
-            // --- UI OVERLAY (Halál és Game Over szövegek) ---
             if (gameState === STATE_CRASHED) {
-                ctx.fillStyle = "rgba(231, 76, 60, 0.3)"; // Halvány piros
+                ctx.fillStyle = "rgba(231, 76, 60, 0.3)"; 
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = "#fff";
                 ctx.font = "bold 40px sans-serif";
@@ -560,7 +554,7 @@
                 ctx.font = "20px sans-serif";
                 ctx.fillText("Kattints a folytatáshoz (-1 élet)", canvas.width / 2, canvas.height / 2 + 20);
             } else if (gameState === STATE_GAMEOVER) {
-                ctx.fillStyle = "rgba(0, 0, 0, 0.8)"; // Sötét fekete
+                ctx.fillStyle = "rgba(0, 0, 0, 0.8)"; 
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = "#fff";
                 ctx.font = "bold 50px sans-serif";
