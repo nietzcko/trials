@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Vonalrajzos Trial Bringa - Finomhangolva</title>
+    <title>Vonalrajzos Trial Bringa - Profi Fizika</title>
     <style>
         body {
             margin: 0;
@@ -43,7 +43,7 @@
 
     <div id="instructions">
         <h2>Trial Bringa</h2>
-        <p>Finom ugrásokkal érd el a sárga célt!</p>
+        <p>A gép megtartja a dőlést, ha hátsó kerékre érkezel!</p>
     </div>
 
     <canvas id="gameCanvas" width="800" height="600"></canvas>
@@ -59,14 +59,14 @@
         let levelWon = false;
 
         // BEÁLLÍTÁSOK
-        const jumpPower = 0.045; // Még kisebb ugróerő
+        const jumpPower = 0.045; 
         const gravity = 0.4;
         const bounceFactor = 0.6; 
         const poseStates = { GROUNDED: 0, AIRBORNE: 1, TAKING_OFF: 2 }; 
 
-        // Bringa objektum
+        // Bringa objektum (A fizikai rádiusz már csak a cél ellenőrzéséhez kell)
         let bike = {
-            x: 100, y: 400, vx: 0, vy: 0, radius: 22, 
+            x: 100, y: 400, vx: 0, vy: 0, radius: 15, 
             angle: 0, angVel: 0, grounded: false,
             pose: poseStates.GROUNDED, tuckFactor: 0 
         };
@@ -149,11 +149,8 @@
                     bike.vx = aimX * jumpPower;
                     bike.vy = aimY * jumpPower;
                     
-                    // Kifejezett, lassú hátra- vagy előrefordulás ugráskor a húzás irányából
-                    // (Ha jobbra ugrasz (aimX > 0), hátrafelé kezd dőlni a gép)
                     bike.angVel = aimX * -0.001; 
                     
-                    // Korlátozzuk a maximális forgást, hogy ne helikopterezzen
                     if (bike.angVel > 0.05) bike.angVel = 0.05;
                     if (bike.angVel < -0.05) bike.angVel = -0.05;
                     
@@ -189,53 +186,84 @@
         function updatePhysics() {
             if (levelWon) return; 
 
-            if (!bike.grounded) {
-                bike.vy += gravity;
-                bike.x += bike.vx;
-                bike.y += bike.vy;
-                bike.angle += bike.angVel;
-                
-                // Repülés közbeni összehúzódás
-                bike.tuckFactor = Math.min(1, bike.tuckFactor + 0.05);
+            // Gravitáció mindig hat, hogy a földön állva se "lebegjen"
+            bike.vy += gravity;
 
-                let hitGroundThisFrame = false;
+            if (!bike.grounded) {
+                bike.tuckFactor = Math.min(1, bike.tuckFactor + 0.05);
+            }
+
+            bike.x += bike.vx;
+            bike.y += bike.vy;
+            bike.angle += bike.angVel;
+
+            // Szög normalizálása -PI és PI közé (hogy a matek mindig jó legyen)
+            while (bike.angle > Math.PI) bike.angle -= Math.PI * 2;
+            while (bike.angle < -Math.PI) bike.angle += Math.PI * 2;
+
+            // --- ÚJ: KERÉK-ALAPÚ ÜTKÖZÉSVIZSGÁLAT ---
+            let hitGroundThisFrame = false;
+
+            // A kerekek és a váz közepe (ütközési pontok)
+            const collisionPoints = [
+                { rx: -25, ry: 10, radius: 12 }, // Hátsó kerék
+                { rx: 30,  ry: 10, radius: 12 }, // Első kerék
+                { rx: 0,   ry: 0,  radius: 10 }  // Középső blokk
+            ];
+
+            for (let p of collisionPoints) {
+                // Pont abszolút koordinátájának kiszámítása a dőlésszög alapján
+                let wx = bike.x + Math.cos(bike.angle)*p.rx - Math.sin(bike.angle)*p.ry;
+                let wy = bike.y + Math.sin(bike.angle)*p.rx + Math.cos(bike.angle)*p.ry;
 
                 for (let t of terrain) {
-                    let closestX = Math.max(t.x, Math.min(bike.x, t.x + t.w));
-                    let closestY = Math.max(t.y, Math.min(bike.y, t.y + t.h));
+                    let closestX = Math.max(t.x, Math.min(wx, t.x + t.w));
+                    let closestY = Math.max(t.y, Math.min(wy, t.y + t.h));
 
-                    let dx = bike.x - closestX;
-                    let dy = bike.y - closestY;
+                    let dx = wx - closestX;
+                    let dy = wy - closestY;
                     let distance = Math.sqrt(dx * dx + dy * dy);
 
-                    if (distance < bike.radius) {
+                    if (distance < p.radius) {
                         let nx = dx / distance;
                         let ny = dy / distance;
+                        let penetration = p.radius - distance;
 
-                        bike.x = closestX + nx * bike.radius;
-                        bike.y = closestY + ny * bike.radius;
+                        // Egész bringa eltolása a behatolás mértékével
+                        bike.x += nx * penetration;
+                        bike.y += ny * penetration;
 
                         if (Math.abs(ny) > Math.abs(nx)) {
-                            if (ny < 0) { 
-                                bike.vy = 0; bike.vx = 0; bike.angVel = 0;
+                            if (ny < 0) { // Talajhoz értünk
+                                bike.vy = 0; 
+                                bike.vx = 0; 
+                                bike.angVel = 0;
                                 hitGroundThisFrame = true;
                                 bike.pose = poseStates.GROUNDED; 
-                            } else {
+                            } else { // Plafon
                                 bike.vy = Math.abs(bike.vy) * 0.5;
                             }
-                        } else {
+                        } else { // Fal
                             bike.vx = -bike.vx * bounceFactor;
                             bike.angVel *= -0.5; 
                         }
                     }
                 }
+            }
 
-                if (hitGroundThisFrame) bike.grounded = true;
-            } else {
-                // Földet érés utáni lágyabb kiegyenesedés
-                bike.angle += (0 - bike.angle) * 0.15;
+            bike.grounded = hitGroundThisFrame;
+
+            // --- ÚJ: SZÖG MEGTARTÁSA ÉS FELRÁNTÁS ---
+            if (bike.grounded) {
+                // Ha az angle > 0, az azt jelenti, hogy az első kerék lejjebb van (orrra esés).
+                if (bike.angle > 0) {
+                    // Finoman felrántja egy kicsit a vízszintes fölé (-0.1 radián = enyhe egykerekezés)
+                    bike.angle += (-0.1 - bike.angle) * 0.1;
+                }
+                // FIGYELEM: Ha bike.angle <= 0, akkor SEMMIT nem csinál a szöggel! 
+                // Emiatt megtartja azt a szöget, ahogy érkezett.
+                
                 bike.tuckFactor = Math.max(0, bike.tuckFactor - 0.1); 
-                if (Math.abs(bike.angle) < 0.01) bike.angle = 0;
             }
             
             // Cél ellenőrzése
@@ -271,7 +299,6 @@
                 const pullX = dragCurrent.x - dragStart.x;
                 const pullY = dragCurrent.y - dragStart.y;
 
-                // Zöld szaggatott: Ugrás iránya
                 ctx.beginPath();
                 ctx.moveTo(bike.x, bike.y);
                 ctx.lineTo(bike.x + aimX, bike.y + aimY);
@@ -280,7 +307,6 @@
                 ctx.setLineDash([5, 5]);
                 ctx.stroke();
                 
-                // Piros folytonos: Csúzli gumi
                 ctx.beginPath();
                 ctx.moveTo(bike.x, bike.y);
                 ctx.lineTo(bike.x + pullX, bike.y + pullY);
@@ -298,57 +324,48 @@
             ctx.lineCap = "round";
             ctx.lineJoin = "round";
 
-            // Vastagabb trial gumik
             ctx.strokeStyle = "#222";
             ctx.lineWidth = 4;
             ctx.beginPath();
-            ctx.arc(-25, 10, 12, 0, Math.PI * 2); // Hátsó
+            ctx.arc(-25, 10, 12, 0, Math.PI * 2); 
             ctx.moveTo(42, 10);
-            ctx.arc(30, 10, 12, 0, Math.PI * 2);  // Első
+            ctx.arc(30, 10, 12, 0, Math.PI * 2);  
             ctx.stroke();
 
-            // Trial váz geometria (alacsony váz, ülés nélkül, bashguard)
             ctx.strokeStyle = "#000";
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(-25, 10); // Láncvilla (Hátsó kerék középpontból)
-            ctx.lineTo(0, 10);   // Középcsapágy (BB)
-            ctx.lineTo(20, -15); // Alsócső a homlokcsőig
-            ctx.lineTo(25, 10);  // Villa az első kerékig
-            ctx.moveTo(20, -15); // Homlokcső tetejétől...
-            ctx.lineTo(-10, 0);  // ...alacsony felsőcső
-            ctx.lineTo(-25, 10); // Támvilla
-            ctx.moveTo(-10, 0);  // Alacsony "nyeregcső"
-            ctx.lineTo(0, 10);   // Vissza a középcsapágyhoz
-            
-            // Bashguard (védőlemez a blokk alatt)
+            ctx.moveTo(-25, 10); 
+            ctx.lineTo(0, 10);   
+            ctx.lineTo(20, -15); 
+            ctx.lineTo(25, 10);  
+            ctx.moveTo(20, -15); 
+            ctx.lineTo(-10, 0);  
+            ctx.lineTo(-25, 10); 
+            ctx.moveTo(-10, 0);  
+            ctx.lineTo(0, 10);   
             ctx.moveTo(-6, 14);
             ctx.lineTo(6, 14);
-            
             ctx.stroke();
 
-            // Kormány
             ctx.beginPath();
             ctx.moveTo(20, -15);
-            ctx.lineTo(18, -20); // Kormányszár
-            ctx.lineTo(22, -22); // Kormányrúd
+            ctx.lineTo(18, -20); 
+            ctx.lineTo(22, -22); 
             ctx.stroke();
 
             // --- ARIFER (Bringás) ---
             ctx.beginPath();
             ctx.strokeStyle = "#1a73e8"; 
             
-            // Fix pontok a bringán
             const hands = { x: 20, y: -22 };  
             const pedals = { x: 0, y: 10 };   
             
-            // Mozgó pontok alapállásban (guggoló, előredőlő trialos póz)
             let butt = { x: -8, y: -12 };   
             let shoulder = { x: 5, y: -28 }; 
             let head = { x: 10, y: -36 };     
 
             if (isDragging) {
-                // A súlypont a húzás (pull) irányába mozdul
                 const pullX = dragCurrent.x - dragStart.x;
                 const pullY = dragCurrent.y - dragStart.y;
                 
@@ -368,7 +385,6 @@
                 head.y += moveY * 0.8;
 
             } else if (!bike.grounded && bike.pose === poseStates.AIRBORNE) {
-                // Levegőben a test kompaktabbá válik
                 butt.x += 6 * bike.tuckFactor;
                 butt.y += 4 * bike.tuckFactor;
                 shoulder.x += 8 * bike.tuckFactor;
@@ -377,18 +393,15 @@
                 head.y += 6 * bike.tuckFactor;
             }
 
-            // Testvonal rajzolása
             ctx.moveTo(butt.x, butt.y); 
-            ctx.lineTo(shoulder.x, shoulder.y); // Gerinc
+            ctx.lineTo(shoulder.x, shoulder.y); 
             
-            // Kéz könyökkel
             let armMx = (shoulder.x + hands.x) / 2 - 3;
             let armMy = (shoulder.y + hands.y) / 2 - 5;
             ctx.moveTo(shoulder.x, shoulder.y);
             ctx.lineTo(armMx, armMy);
             ctx.lineTo(hands.x, hands.y);
             
-            // Láb térddel (többet hajlik az alacsonyabb váz miatt)
             let legMx = (butt.x + pedals.x) / 2 + 8;
             let legMy = (butt.y + pedals.y) / 2 - 2;
             ctx.moveTo(butt.x, butt.y);
@@ -397,14 +410,12 @@
             
             ctx.stroke();
 
-            // Fej
             ctx.beginPath();
             ctx.arc(head.x, head.y, 5, 0, Math.PI * 2);
             ctx.stroke();
 
             ctx.restore();
 
-            // Győzelmi felirat
             if (levelWon) {
                 ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
