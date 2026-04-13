@@ -431,8 +431,8 @@
             bike.x += bike.vx;
             bike.y += bike.vy;
 
-            let headRx = 10 * bike.dir;
-            let headRy = -55;
+            let headRx = 8 * bike.dir;
+            let headRy = -52;
             let headWx = bike.x + Math.cos(bike.angle)*headRx - Math.sin(bike.angle)*headRy;
             let headWy = bike.y + Math.sin(bike.angle)*headRx + Math.cos(bike.angle)*headRy;
 
@@ -492,8 +492,8 @@
                                 }
 
                                 bike.vy = 0;
-                                    if (p.name === 'rear' || p.name === 'front') bike.vx *= 0.35;
-                                    if (p.name === 'pedal') bike.vx *= 0.92;
+                                if (p.name === 'rear' || p.name === 'front') bike.vx *= 0.35;
+                                if (p.name === 'pedal') bike.vx *= 0.92;
                                 bike.angVel = 0;
                                 bike.targetAirAngle = 0;
                                 bike.airRotateStrength = 0.12;
@@ -651,23 +651,21 @@
             ctx.strokeStyle = "rgba(255,255,255,0.1)";
             ctx.lineWidth = 4;
             ctx.beginPath();
-            ctx.arc(-25, 10, 12, 0, Math.PI * 2);
+            ctx.arc(-22, 12, 12, 0, Math.PI * 2);
             ctx.stroke();
-
             ctx.beginPath();
-            ctx.arc(-25, 10, 8, 0, Math.PI * 2);
+            ctx.arc(-22, 12, 8, 0, Math.PI * 2);
             ctx.strokeStyle = colors.main;
             ctx.lineWidth = 1;
             ctx.stroke();
 
             ctx.beginPath();
-            ctx.arc(30, 10, 12, 0, Math.PI * 2);
+            ctx.arc(24, 12, 12, 0, Math.PI * 2);
             ctx.strokeStyle = "rgba(255,255,255,0.1)";
             ctx.lineWidth = 4;
             ctx.stroke();
-
             ctx.beginPath();
-            ctx.arc(30, 10, 8, 0, Math.PI * 2);
+            ctx.arc(24, 12, 8, 0, Math.PI * 2);
             ctx.strokeStyle = colors.main;
             ctx.lineWidth = 1;
             ctx.stroke();
@@ -675,21 +673,26 @@
             ctx.strokeStyle = "rgba(255,255,255,0.8)";
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(-25, 10);
-            ctx.lineTo(0, 10);
-            ctx.lineTo(20, -15);
-            ctx.lineTo(30, 10);
-            ctx.moveTo(20, -15);
-            ctx.lineTo(-10, 0);
-            ctx.lineTo(-25, 10);
-            ctx.moveTo(-10, 0);
-            ctx.lineTo(0, 10);
+            ctx.moveTo(-22, 12);
+            ctx.lineTo(2, 4);
+            ctx.lineTo(18, -16);
+            ctx.lineTo(24, 12);
+            ctx.moveTo(18, -16);
+            ctx.lineTo(-6, -2);
+            ctx.lineTo(-22, 12);
+            ctx.moveTo(-6, -2);
+            ctx.lineTo(2, 4);
             ctx.stroke();
 
             ctx.beginPath();
-            ctx.moveTo(20, -15);
-            ctx.lineTo(18, -20);
-            ctx.lineTo(22, -22);
+            ctx.moveTo(-8, -4);
+            ctx.lineTo(-3, -5);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(18, -16);
+            ctx.lineTo(17, -24);
+            ctx.lineTo(22, -27);
             ctx.stroke();
 
             ctx.beginPath();
@@ -698,11 +701,11 @@
             ctx.shadowBlur = 10;
             ctx.shadowColor = ctx.strokeStyle;
 
-            const hands = { x: 20, y: -22 };
-            const pedals = { x: 0, y: 10 };
-            let butt = { x: -12, y: -22 };
-            let shoulder = { x: 5, y: -45 };
-            let head = { x: 10, y: -55 };
+            const hands = { x: 22, y: -27 };
+            const pedals = { x: 2, y: 4 };
+            let butt = { x: -8, y: -18 };
+            let shoulder = { x: 2, y: -42 };
+            let head = { x: 6, y: -52 };
 
             if (isDragging && gameState === STATE_PLAYING) {
                 const pullX = dragCurrent.x - dragStart.x;
@@ -712,34 +715,34 @@
 
                 if (pullLen > 0) {
                     let moveDist = Math.min(pullLen, maxDragDistance);
-                    butt.x += (localPullX/pullLen)*(moveDist*0.12);
-                    butt.y += (pullY/pullLen)*(moveDist*0.12);
-                    shoulder.x += (localPullX/pullLen)*(moveDist*0.15);
-                    shoulder.y += (pullY/pullLen)*(moveDist*0.15);
-                    head.x += (localPullX/pullLen)*(moveDist*0.15);
-                    head.y += (pullY/pullLen)*(moveDist*0.15);
+                    butt.x += (localPullX/pullLen)*(moveDist*0.10);
+                    butt.y += (pullY/pullLen)*(moveDist*0.10);
+                    shoulder.x += (localPullX/pullLen)*(moveDist*0.14);
+                    shoulder.y += (pullY/pullLen)*(moveDist*0.14);
+                    head.x += (localPullX/pullLen)*(moveDist*0.14);
+                    head.y += (pullY/pullLen)*(moveDist*0.14);
                 }
             } else if (!bike.grounded && bike.pose === poseStates.AIRBORNE) {
                 const airy = bike.tuckFactor;
-                butt.x += 8 * airy;
+                butt.x += 7 * airy;
                 butt.y += 7 * airy;
                 shoulder.x += 10 * airy;
-                shoulder.y += 9 * airy;
+                shoulder.y += 10 * airy;
                 head.x += 10 * airy;
-                head.y += 9 * airy;
+                head.y += 10 * airy;
             }
 
             ctx.moveTo(butt.x, butt.y);
             ctx.lineTo(shoulder.x, shoulder.y);
 
-            let armMx = (shoulder.x + hands.x) / 2 - 5;
-            let armMy = (shoulder.y + hands.y) / 2 - 8;
+            let armMx = (shoulder.x + hands.x) / 2 - 4;
+            let armMy = (shoulder.y + hands.y) / 2 - 6;
             ctx.moveTo(shoulder.x, shoulder.y);
             ctx.lineTo(armMx, armMy);
             ctx.lineTo(hands.x, hands.y);
 
-            let legMx = (butt.x + pedals.x) / 2 + 12;
-            let legMy = (butt.y + pedals.y) / 2 - 4;
+            let legMx = (butt.x + pedals.x) / 2 + 9;
+            let legMy = (butt.y + pedals.y) / 2 - 3;
             ctx.moveTo(butt.x, butt.y);
             ctx.lineTo(legMx, legMy);
             ctx.lineTo(pedals.x, pedals.y);
