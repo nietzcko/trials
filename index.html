@@ -101,10 +101,9 @@
         let genX = 0;
         let genY = 0;
 
-        // --- ÚJ PARALLAX HÁTTÉR ÁLLAPOT ---
         let bgBuildings = [];
         let totalBgCycleWidth = 0;
-        const parallaxFactor = 0.2; // A város 20%-os sebességgel mozog
+        const parallaxFactor = 0.2; 
 
         const getCSSVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
         const colors = {
@@ -197,7 +196,6 @@
             }
         }
 
-        // --- ÚJ VÁROS GENERÁLÁS ---
         function generateBgBuildings() {
             bgBuildings = [];
             totalBgCycleWidth = 0;
@@ -216,23 +214,27 @@
             terrain = [];
             updateHUD();
             
-            // Háttér város generálása
             generateBgBuildings();
             
-            genX = 0; genY = 600;
+            // --- JAVÍTOTT TUTORIAL ZÓNA ---
+            // Biztonságos padló
             terrain.push({ type: 'rect', x: -200, y: 600, w: 1800, h: 150, landed: true }); 
-            terrain.push({ type: 'rect', x: 500, y: 500, w: 150, h: 30, landed: false }); 
-            terrain.push({ type: 'rect', x: 800, y: 400, w: 100, h: 30, landed: false }); 
-            terrain.push({ type: 'rect', x: 1100, y: 300, w: 80, h: 30, landed: false }); 
             
+            // Lebegő gyakorló platformok (kisebb és könnyebb ugrásokkal)
+            terrain.push({ type: 'rect', x: 400, y: 530, w: 150, h: 30, landed: false }); 
+            terrain.push({ type: 'rect', x: 650, y: 460, w: 120, h: 30, landed: false }); 
+            terrain.push({ type: 'rect', x: 900, y: 390, w: 100, h: 30, landed: false }); 
+            
+            // AZ ÉLES PÁLYA A PADLÓ VÉGÉNÉL ÉS SZINTJÉN KEZDŐDIK!
             genX = 1600; 
-            genY = 300;
+            genY = 600; 
 
+            // Szövegek a megfelelő magasságokba igazítva
             tutorialTexts = [
                 { text: "DRAG & RELEASE TO JUMP", x: 250, y: 450 },
                 { text: "TILT WITH DRAG DIRECTION", x: 650, y: 350 },
-                { text: "DON'T HIT YOUR HEAD!", x: 1100, y: 150 },
-                { text: "GOOD LUCK!", x: 1600, y: 200 }
+                { text: "DON'T HIT YOUR HEAD!", x: 1100, y: 250 },
+                { text: "GOOD LUCK!", x: 1600, y: 450 }
             ];
             
             for(let i=0; i<10; i++) generateObstacle();
@@ -459,30 +461,25 @@
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // --- ÚJ PARALLAX VÁROS RAJZOLÁSA (Kamera eltolás nélkül) ---
             ctx.save();
-            // Kiszámítjuk a háttér eltolását (Modulo alapján, hogy seamlessen loopoljon)
             const bgOffset = (cameraX * parallaxFactor) % totalBgCycleWidth;
             ctx.translate(-bgOffset, 0);
 
-            // Halvány, semi-átlátszó sötét sziluett
             ctx.fillStyle = "rgba(31, 40, 51, 0.4)"; 
 
             let currentX = 0;
-            // Loop pool twice to cover visible screen with scrolling
             for (let i = 0; i < 2; i++) {
                 for (let b of bgBuildings) {
-                    ctx.fillRect(currentX, canvas.height - b.h - 50, b.w, b.h); // Anchored near bottom
+                    ctx.fillRect(currentX, canvas.height - b.h - 50, b.w, b.h); 
                     currentX += b.w + 5;
                 }
             }
             ctx.restore();
 
-            // Pálya és Bringa kamera eltolás
             ctx.save();
             ctx.translate(-cameraX, -cameraY);
 
-            ctx.fillStyle = "rgba(102, 252, 241, 0.4)"; // Neon cyan, translucent
+            ctx.fillStyle = "rgba(102, 252, 241, 0.4)"; 
             ctx.font = "bold 24px sans-serif";
             ctx.textAlign = "center";
             for (let txt of tutorialTexts) {
@@ -547,59 +544,20 @@
             ctx.beginPath(); ctx.arc(30, 10, 8, 0, Math.PI * 2); ctx.strokeStyle = colors.main; ctx.lineWidth = 1; ctx.stroke();
 
             ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.moveTo(-25, 10); ctx.lineTo(0, 10); ctx.lineTo(20, -15); ctx.lineTo(30, 10); 
-            ctx.moveTo(20, -15); ctx.lineTo(-10, 0); ctx.lineTo(-25, 10); ctx.moveTo(-10, 0); ctx.lineTo(0, 10); ctx.stroke();
+            ctx.beginPath(); 
+            ctx.moveTo(-25, 10); 
+            ctx.lineTo(0, 10);   
+            ctx.lineTo(20, -15); 
+            ctx.lineTo(30, 10);  
+            ctx.moveTo(20, -15); 
+            ctx.lineTo(-10, 0);  
+            ctx.lineTo(-25, 10); 
+            ctx.moveTo(-10, 0);  
+            ctx.lineTo(0, 10);   
+            ctx.stroke();
+
             ctx.beginPath(); ctx.moveTo(20, -15); ctx.lineTo(18, -20); ctx.lineTo(22, -22); ctx.stroke();
 
             ctx.beginPath();
             ctx.strokeStyle = gameState !== STATE_PLAYING ? colors.alt : colors.main; 
-            ctx.lineWidth = 4; ctx.shadowBlur = 10; ctx.shadowColor = ctx.strokeStyle;
-            
-            const hands = { x: 20, y: -22 }; const pedals = { x: 0, y: 10 };   
-            let butt = { x: -12, y: -22 }; let shoulder = { x: 5, y: -45 }; let head = { x: 10, y: -55 };     
-
-            if (isDragging && gameState === STATE_PLAYING) {
-                const pullX = dragCurrent.x - dragStart.x; const pullY = dragCurrent.y - dragStart.y;
-                const localPullX = pullX * bike.dir; let pullLen = Math.sqrt(localPullX*localPullX + pullY*pullY);
-                if (pullLen > 0) {
-                    let moveDist = Math.min(pullLen, maxDragDistance);
-                    butt.x += (localPullX/pullLen)*(moveDist*0.12); butt.y += (pullY/pullLen)*(moveDist*0.12);
-                    shoulder.x += (localPullX/pullLen)*(moveDist*0.15); shoulder.y += (pullY/pullLen)*(moveDist*0.15);
-                    head.x += (localPullX/pullLen)*(moveDist*0.15); head.y += (pullY/pullLen)*(moveDist*0.15);
-                }
-            } else if (!bike.grounded && bike.pose === poseStates.AIRBORNE) {
-                butt.x += 10 * bike.tuckFactor; butt.y += 8 * bike.tuckFactor;
-                shoulder.x += 12 * bike.tuckFactor; shoulder.y += 10 * bike.tuckFactor;
-                head.x += 12 * bike.tuckFactor; head.y += 10 * bike.tuckFactor;
-            }
-
-            ctx.moveTo(butt.x, butt.y); ctx.lineTo(shoulder.x, shoulder.y); 
-            let armMx = (shoulder.x + hands.x) / 2 - 5; let armMy = (shoulder.y + hands.y) / 2 - 8;
-            ctx.moveTo(shoulder.x, shoulder.y); ctx.lineTo(armMx, armMy); ctx.lineTo(hands.x, hands.y);
-            let legMx = (butt.x + pedals.x) / 2 + 12; let legMy = (butt.y + pedals.y) / 2 - 4;
-            ctx.moveTo(butt.x, butt.y); ctx.lineTo(legMx, legMy); ctx.lineTo(pedals.x, pedals.y);
-            ctx.stroke();
-
-            ctx.beginPath(); ctx.arc(head.x, head.y, 8, 0, Math.PI * 2); ctx.fillStyle = ctx.strokeStyle; ctx.fill();
-            ctx.shadowBlur = 0; ctx.restore(); ctx.restore(); 
-
-            if (gameState === STATE_GAMEOVER) {
-                ctx.fillStyle = "rgba(0, 0, 0, 0.9)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = colors.alt; ctx.font = "bold 55px sans-serif"; ctx.textAlign = "center";
-                ctx.fillText("CRASHED", canvas.width / 2, canvas.height / 2 - 40);
-                ctx.font = "30px sans-serif"; ctx.fillStyle = colors.scored; ctx.fillText(`SCORE: ${score}`, canvas.width / 2, canvas.height / 2 + 10);
-                ctx.fillStyle = "#fff"; ctx.font = "16px sans-serif"; ctx.fillText("Click anywhere to restart!", canvas.width / 2, canvas.height / 2 + 70);
-            }
-        }
-
-        function gameLoop() {
-            updatePhysics();
-            draw();
-            requestAnimationFrame(gameLoop);
-        }
-
-        initGame();
-        gameLoop();
-    </script>
-</body>
-</html>
+            ctx.lineWidth = 4; ctx.shadowBlur =
