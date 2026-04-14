@@ -273,7 +273,7 @@
                 let y = genY + (Math.random() * 80 - 40);
                 terrain.push({
                     type: 'moving', x: startX, y: y, baseX: startX, w: w, h: 22,
-                    range: 34 + Math.random() * 26, speed: 0.004 + Math.random() * 0.006,
+                    range: 28 + Math.random() * 18, speed: 0.002 + Math.random() * 0.003,
                     phase: Math.random() * Math.PI * 2, landed: false
                 });
                 genX = startX + w + 40;
@@ -286,7 +286,7 @@
                 let landW = 58 + Math.random() * 24;
 
                 terrain.push({type: 'rect', x: startX, y: baseY, w: leadW, h: 24, landed: false});
-                terrain.push({type: 'laser', x: startX + leadW + gap * 0.5, y: baseY - 118, w: 14, h: 92, landed: false});
+                terrain.push({type: 'laser', x: startX + leadW + gap * 0.5, y: baseY - 72, w: 14, h: 48, landed: false});
                 terrain.push({type: 'rect', x: startX + leadW + gap, y: baseY, w: landW, h: 24, landed: false});
 
                 genX = startX + leadW + gap + landW;
@@ -499,8 +499,10 @@
                 }
                 else if (t.type === 'break' && t.breaking) {
                     t.timer++;
-                    t.y += 0.9;
-                    if (t.timer > 18) t.dead = true;
+                    if (t.timer > 75) {
+                        t.y += 0.9;
+                    }
+                    if (t.timer > 120) t.dead = true;
                 }
             }
             terrain = terrain.filter(t => !t.dead && t.x > cameraX - 1000);
