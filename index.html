@@ -154,7 +154,7 @@
             let gapX = 70 + Math.random() * 80;
             let startX = genX + gapX;
 
-            let type = Math.floor(Math.random() * 6);
+            let type = Math.floor(Math.random() * 13);
 
             if (genY < 250) type = Math.max(type, 3);
             if (genY > 750) type = Math.min(type, 2);
@@ -210,6 +210,97 @@
                 terrain.push({type: 'slope', x: startX, y: genY, w: w, h: h, angle: angle, landed: false});
                 genX = startX + w * Math.cos(angle);
                 genY = genY + w * Math.sin(angle);
+            }
+            else if (type === 6) {
+                let currX = startX;
+                let baseY = genY + (Math.random() * 80 - 40);
+                let count = 2 + Math.floor(Math.random() * 3);
+
+                for (let i = 0; i < count; i++) {
+                    let w = 24 + Math.random() * 22;
+                    let gap = 35 + Math.random() * 45;
+                    terrain.push({type: 'rect', x: currX, y: baseY, w: w, h: 22, landed: false});
+                    currX += w + gap;
+                }
+
+                genX = currX;
+                genY = baseY;
+            }
+            else if (type === 7) {
+                let baseY = genY + (Math.random() * 60 - 30);
+                let lowW = 36 + Math.random() * 18;
+                let highW = 34 + Math.random() * 18;
+                let gap = 18 + Math.random() * 18;
+                let stepUp = 45 + Math.random() * 30;
+
+                terrain.push({type: 'rect', x: startX, y: baseY, w: lowW, h: 24, landed: false});
+                terrain.push({type: 'rect', x: startX + lowW + gap, y: baseY - stepUp, w: highW, h: 24, landed: false});
+
+                genX = startX + lowW + gap + highW;
+                genY = baseY - stepUp;
+            }
+            else if (type === 8) {
+                let baseY = genY + (Math.random() * 50 - 25);
+                let kickerW = 26 + Math.random() * 12;
+                let kickerH = 20;
+                let gap = 28 + Math.random() * 24;
+                let landW = 54 + Math.random() * 28;
+
+                terrain.push({type: 'slope', x: startX, y: baseY, w: kickerW, h: kickerH, angle: -0.32, landed: false});
+                let landX = startX + kickerW + gap;
+                terrain.push({type: 'rect', x: landX, y: baseY - 8, w: landW, h: 24, landed: false});
+
+                genX = landX + landW;
+                genY = baseY - 8;
+            }
+            else if (type === 9) {
+                let currX = startX;
+                let currY = genY + (Math.random() * 40 - 20);
+                let count = 3 + Math.floor(Math.random() * 2);
+
+                for (let i = 0; i < count; i++) {
+                    let w = 22 + Math.random() * 14;
+                    terrain.push({type: 'rect', x: currX, y: currY, w: w, h: 20, landed: false});
+                    currX += w + (18 + Math.random() * 18);
+                    currY -= 24 + Math.random() * 18;
+                }
+
+                genX = currX;
+                genY = currY + 28;
+            }
+            else if (type === 10) {
+                let w = 80 + Math.random() * 40;
+                let y = genY + (Math.random() * 80 - 40);
+                terrain.push({
+                    type: 'moving', x: startX, y: y, baseX: startX, w: w, h: 22,
+                    range: 34 + Math.random() * 26, speed: 0.004 + Math.random() * 0.006,
+                    phase: Math.random() * Math.PI * 2, landed: false
+                });
+                genX = startX + w + 40;
+                genY = y;
+            }
+            else if (type === 11) {
+                let baseY = genY + (Math.random() * 40 - 20);
+                let leadW = 52 + Math.random() * 24;
+                let gap = 34 + Math.random() * 14;
+                let landW = 58 + Math.random() * 24;
+
+                terrain.push({type: 'rect', x: startX, y: baseY, w: leadW, h: 24, landed: false});
+                terrain.push({type: 'laser', x: startX + leadW + gap * 0.5, y: baseY - 118, w: 14, h: 92, landed: false});
+                terrain.push({type: 'rect', x: startX + leadW + gap, y: baseY, w: landW, h: 24, landed: false});
+
+                genX = startX + leadW + gap + landW;
+                genY = baseY;
+            }
+            else if (type === 12) {
+                let w = 60 + Math.random() * 30;
+                let y = genY + (Math.random() * 70 - 35);
+                terrain.push({
+                    type: 'break', x: startX, y: y, w: w, h: 24,
+                    timer: 0, breaking: false, dead: false, landed: false
+                });
+                genX = startX + w + 35;
+                genY = y;
             }
         }
 
@@ -336,6 +427,9 @@
         window.addEventListener('touchend', endDrag);
 
         function checkCollision(px, py, radius, t) {
+            if (t.type === 'laser') {
+                return { hit: false };
+            }
             if (t.type === 'circle') {
                 let dx = px - t.x;
                 let dy = py - t.y;
@@ -396,8 +490,20 @@
 
             if (cameraX + canvas.width > genX - 500) {
                 generateObstacle();
-                terrain = terrain.filter(t => t.x > cameraX - 1000);
             }
+
+            const now = performance.now();
+            for (let t of terrain) {
+                if (t.type === 'moving') {
+                    t.x = t.baseX + Math.sin(now * t.speed + t.phase) * t.range;
+                }
+                else if (t.type === 'break' && t.breaking) {
+                    t.timer++;
+                    t.y += 0.9;
+                    if (t.timer > 18) t.dead = true;
+                }
+            }
+            terrain = terrain.filter(t => !t.dead && t.x > cameraX - 1000);
 
             bike.vy += gravity;
 
@@ -437,6 +543,17 @@
             let headWy = bike.y + Math.sin(bike.angle)*headRx + Math.cos(bike.angle)*headRy;
 
             for (let t of terrain) {
+                if (t.type === 'laser') {
+                    let inX = headWx > t.x && headWx < t.x + t.w;
+                    let inY = headWy > t.y && headWy < t.y + t.h;
+                    if (inX && inY) {
+                        gameState = STATE_GAMEOVER;
+                        return;
+                    }
+                }
+            }
+
+            for (let t of terrain) {
                 let hitResult = checkCollision(headWx, headWy, 12, t);
                 if (hitResult.hit) {
                     gameState = STATE_GAMEOVER;
@@ -472,6 +589,10 @@
                     if (c.hit) {
                         bike.x += c.nx * c.pen;
                         bike.y += c.ny * c.pen;
+
+                        if (t.type === 'break' && c.ny < -0.5 && (p.name === 'rear' || p.name === 'front' || p.name === 'pedal')) {
+                            t.breaking = true;
+                        }
 
                         if (!t.landed && c.ny < -0.5 && (p.name === 'rear' || p.name === 'front' || p.name === 'pedal')) {
                             t.landed = true;
@@ -570,7 +691,11 @@
                 ctx.fillStyle = colors.platform;
                 let edgeColor = t.landed ? colors.scored : colors.main;
 
-                if (t.type === 'rect') {
+                if (t.type === 'rect' || t.type === 'moving' || t.type === 'break') {
+                    if (t.type === 'break') {
+                        ctx.fillStyle = t.breaking ? 'rgba(255, 0, 140, 0.92)' : 'rgba(255, 0, 140, 0.42)';
+                        edgeColor = '#ff4dc4';
+                    }
                     ctx.fillRect(t.x, t.y, t.w, t.h);
                     ctx.beginPath();
                     ctx.moveTo(t.x, t.y+1);
@@ -578,6 +703,15 @@
                     ctx.lineWidth = t.landed ? 3 : 2;
                     ctx.strokeStyle = edgeColor;
                     ctx.stroke();
+
+                    if (t.type === 'moving') {
+                        ctx.beginPath();
+                        ctx.moveTo(t.x + 12, t.y + t.h - 4);
+                        ctx.lineTo(t.x + t.w - 12, t.y + t.h - 4);
+                        ctx.lineWidth = 2;
+                        ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+                        ctx.stroke();
+                    }
                 }
                 else if (t.type === 'circle') {
                     ctx.beginPath();
@@ -600,6 +734,20 @@
                     ctx.strokeStyle = edgeColor;
                     ctx.stroke();
                     ctx.restore();
+                }
+                else if (t.type === 'laser') {
+                    ctx.fillStyle = 'rgba(255, 0, 85, 0.16)';
+                    ctx.fillRect(t.x, t.y, t.w, t.h);
+                    ctx.strokeStyle = colors.alt;
+                    ctx.lineWidth = 3;
+                    ctx.shadowBlur = 18;
+                    ctx.shadowColor = colors.alt;
+                    ctx.strokeRect(t.x, t.y, t.w, t.h);
+                    ctx.beginPath();
+                    ctx.moveTo(t.x + t.w * 0.5, t.y + 10);
+                    ctx.lineTo(t.x + t.w * 0.5, t.y + t.h - 10);
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
                 }
             }
 
