@@ -274,19 +274,19 @@
                 terrain.push({
                     type: 'moving', x: startX, y: y, baseX: startX, w: w, h: 22,
                     range: 28 + Math.random() * 18, speed: 0.002 + Math.random() * 0.003,
-                    phase: Math.random() * Math.PI * 2, landed: false
+                    phase: Math.random() * Math.PI * 2, moveDX: 0, landed: false
                 });
                 genX = startX + w + 40;
                 genY = y;
             }
             else if (type === 11) {
                 let baseY = genY + (Math.random() * 40 - 20);
-                let leadW = 52 + Math.random() * 24;
-                let gap = 34 + Math.random() * 14;
+                let leadW = 86 + Math.random() * 32;
+                let gap = 32 + Math.random() * 12;
                 let landW = 58 + Math.random() * 24;
 
                 terrain.push({type: 'rect', x: startX, y: baseY, w: leadW, h: 24, landed: false});
-                terrain.push({type: 'laser', x: startX + leadW + gap * 0.5, y: baseY - 72, w: 14, h: 48, landed: false});
+                terrain.push({type: 'laser', x: startX + leadW + gap * 0.5, y: baseY - 50, w: 8, h: 30, landed: false});
                 terrain.push({type: 'rect', x: startX + leadW + gap, y: baseY, w: landW, h: 24, landed: false});
 
                 genX = startX + leadW + gap + landW;
@@ -495,7 +495,9 @@
             const now = performance.now();
             for (let t of terrain) {
                 if (t.type === 'moving') {
+                    let prevX = t.x;
                     t.x = t.baseX + Math.sin(now * t.speed + t.phase) * t.range;
+                    t.moveDX = t.x - prevX;
                 }
                 else if (t.type === 'break' && t.breaking) {
                     t.timer++;
@@ -587,6 +589,18 @@
                 }
 
                 for (let t of terrain) {
+                    if (t.type === 'laser') {
+                        let closestX = Math.max(t.x, Math.min(wx, t.x + t.w));
+                        let closestY = Math.max(t.y, Math.min(wy, t.y + t.h));
+                        let dx = wx - closestX;
+                        let dy = wy - closestY;
+                        if (dx * dx + dy * dy < p.radius * p.radius) {
+                            gameState = STATE_GAMEOVER;
+                            return;
+                        }
+                        continue;
+                    }
+
                     let c = checkCollision(wx, wy, p.radius, t);
                     if (c.hit) {
                         bike.x += c.nx * c.pen;
@@ -614,6 +628,9 @@
                                     pedalContact = { wx, wy, nx: c.nx, ny: c.ny };
                                 }
 
+                                if (t.type === 'moving') {
+                                    bike.x += t.moveDX || 0;
+                                }
                                 bike.vy = 0;
                                 if (p.name === 'rear' || p.name === 'front') bike.vx *= 0.35;
                                 if (p.name === 'pedal') bike.vx *= 0.92;
