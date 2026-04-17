@@ -110,6 +110,17 @@
             bg: getCSSVar('--bg-color')
         };
 
+        const wheelColors = {
+            rear: '#00f3ff',
+            front: '#ff0055'
+        };
+
+        let tutorialShown = {
+            wheelOrder: false
+        };
+
+        let worldHint = null;
+
         const jumpPower = 0.045;
         const gravity = 0.4;
         const bounceFactor = 0.4;
@@ -150,11 +161,26 @@
             return Math.max(min, Math.min(max, v));
         }
 
+        function getWheelColorName(partName) {
+            if (partName === 'rear') return 'rear';
+            if (partName === 'front') return 'front';
+            return null;
+        }
+
+        function getWheelColorValue(partName) {
+            const key = getWheelColorName(partName);
+            return key ? wheelColors[key] : null;
+        }
+
+        function getWheelPlatformFill(requiredWheel) {
+            return requiredWheel === 'rear' ? 'rgba(0, 243, 255, 0.24)' : 'rgba(255, 0, 85, 0.24)';
+        }
+
         function generateObstacle() {
             let gapX = 70 + Math.random() * 80;
             let startX = genX + gapX;
 
-            let type = Math.floor(Math.random() * 13);
+            let type = Math.floor(Math.random() * 14);
 
             if (genY < 250) type = Math.max(type, 3);
             if (genY > 750) type = Math.min(type, 2);
@@ -302,11 +328,43 @@
                 genX = startX + w + 35;
                 genY = y;
             }
+            else if (type === 13) {
+                let y = genY + (Math.random() * 60 - 30);
+                let size = 26 + Math.random() * 10;
+                let requiredWheel = Math.random() < 0.5 ? 'rear' : 'front';
+
+                terrain.push({
+                    type: 'wheelGate',
+                    x: startX,
+                    y: y,
+                    w: size,
+                    h: size,
+                    landed: false,
+                    requiredWheel: requiredWheel,
+                    triggered: false,
+                    showHint: !tutorialShown.wheelOrder
+                });
+
+                if (!tutorialShown.wheelOrder) {
+                    tutorialShown.wheelOrder = true;
+                    worldHint = {
+                        type: 'wheelOrder',
+                        targetX: startX + size / 2,
+                        targetY: y - 24,
+                        timer: 360
+                    };
+                }
+
+                genX = startX + size + 45;
+                genY = y;
+            }
         }
 
         function initGame() {
             score = 0;
             terrain = [];
+            tutorialShown.wheelOrder = false;
+            worldHint = null;
             updateHUD();
 
             genX = 0; genY = 600;
@@ -417,12 +475,12 @@
         canvas.addEventListener('touchstart', (e) => {
             const pos = getPointerPos(e.touches[0].clientX, e.touches[0].clientY);
             startDrag(pos.x, pos.y);
-        });
+        }, { passive: true });
 
         canvas.addEventListener('touchmove', (e) => {
             const pos = getPointerPos(e.touches[0].clientX, e.touches[0].clientY);
             moveDrag(pos.x, pos.y);
-        });
+        }, { passive: true });
 
         window.addEventListener('touchend', endDrag);
 
@@ -508,6 +566,11 @@
                 }
             }
             terrain = terrain.filter(t => !t.dead && t.x > cameraX - 1000);
+
+            if (worldHint) {
+                worldHint.timer--;
+                if (worldHint.timer <= 0) worldHint = null;
+            }
 
             bike.vy += gravity;
 
@@ -603,6 +666,19 @@
 
                     let c = checkCollision(wx, wy, p.radius, t);
                     if (c.hit) {
+                        if (t.type === 'wheelGate' && !t.triggered) {
+                            if (p.name === 'rear' || p.name === 'front') {
+                                t.triggered = true;
+                                if (p.name !== t.requiredWheel) {
+                                    gameState = STATE_GAMEOVER;
+                                    return;
+                                }
+                            } else {
+                                gameState = STATE_GAMEOVER;
+                                return;
+                            }
+                        }
+
                         bike.x += c.nx * c.pen;
                         bike.y += c.ny * c.pen;
 
@@ -696,31 +772,37 @@
             let centerPulse = Math.sin(bgPulse) * 0.03 + 0.03;
             let grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.width);
             grad.addColorStop(0, `rgba(102, 252, 241, ${centerPulse})`);
-            grad.addColorStop(1, "transparent");
+            grad.addColorStop(1, 'transparent');
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             ctx.save();
             ctx.translate(-cameraX, -cameraY);
 
-            ctx.lineJoin = "miter";
-            ctx.lineCap = "butt";
+            ctx.lineJoin = 'miter';
+            ctx.lineCap = 'butt';
 
             for (let t of terrain) {
                 ctx.fillStyle = colors.platform;
                 let edgeColor = t.landed ? colors.scored : colors.main;
 
-                if (t.type === 'rect' || t.type === 'moving' || t.type === 'break') {
+                if (t.type === 'rect' || t.type === 'moving' || t.type === 'break' || t.type === 'wheelGate') {
                     if (t.type === 'break') {
                         ctx.fillStyle = t.breaking ? 'rgba(255, 0, 140, 0.92)' : 'rgba(255, 0, 140, 0.42)';
                         edgeColor = '#ff4dc4';
                     }
+
+                    if (t.type === 'wheelGate') {
+                        ctx.fillStyle = getWheelPlatformFill(t.requiredWheel);
+                        edgeColor = t.requiredWheel === 'rear' ? wheelColors.rear : wheelColors.front;
+                    }
+
                     ctx.fillRect(t.x, t.y, t.w, t.h);
                     ctx.beginPath();
                     ctx.moveTo(t.x, t.y+1);
                     ctx.lineTo(t.x+t.w, t.y+1);
                     ctx.lineWidth = t.landed ? 3 : 2;
-                    ctx.strokeStyle = edgeColor;
+                    ctx.strokeStyle = t.landed ? colors.scored : edgeColor;
                     ctx.stroke();
 
                     if (t.type === 'moving') {
@@ -729,6 +811,14 @@
                         ctx.lineTo(t.x + t.w - 12, t.y + t.h - 4);
                         ctx.lineWidth = 2;
                         ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+                        ctx.stroke();
+                    }
+
+                    if (t.type === 'wheelGate') {
+                        ctx.beginPath();
+                        ctx.strokeStyle = t.landed ? colors.scored : edgeColor;
+                        ctx.lineWidth = 2;
+                        ctx.arc(t.x + t.w / 2, t.y + t.h / 2, Math.min(t.w, t.h) * 0.22, 0, Math.PI * 2);
                         ctx.stroke();
                     }
                 }
@@ -770,6 +860,20 @@
                 }
             }
 
+            if (worldHint && worldHint.type === 'wheelOrder') {
+                ctx.save();
+                ctx.globalAlpha = Math.min(1, worldHint.timer / 40 + 0.15);
+                ctx.textAlign = 'center';
+                ctx.font = 'bold 18px system-ui, sans-serif';
+                ctx.fillStyle = '#ffffff';
+                ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+                ctx.lineWidth = 5;
+                const text = 'A blokk színével egyező kerék érkezzen először!';
+                ctx.strokeText(text, worldHint.targetX, worldHint.targetY);
+                ctx.fillText(text, worldHint.targetX, worldHint.targetY);
+                ctx.restore();
+            }
+
             if (isDragging && gameState === STATE_PLAYING) {
                 let aimX = dragStart.x - dragCurrent.x;
                 let aimY = dragStart.y - dragCurrent.y;
@@ -787,7 +891,7 @@
                 ctx.beginPath();
                 ctx.moveTo(bike.x, bike.y);
                 ctx.lineTo(bike.x + aimX, bike.y + aimY);
-                ctx.strokeStyle = "rgba(102, 252, 241, 0.5)";
+                ctx.strokeStyle = 'rgba(102, 252, 241, 0.5)';
                 ctx.lineWidth = 2;
                 ctx.setLineDash([8, 6]);
                 ctx.stroke();
@@ -796,7 +900,7 @@
                 ctx.beginPath();
                 ctx.moveTo(bike.x, bike.y);
                 ctx.lineTo(bike.x + dragX, bike.y + dragY);
-                ctx.strokeStyle = "rgba(255, 0, 85, 0.6)";
+                ctx.strokeStyle = 'rgba(255, 0, 85, 0.6)';
                 ctx.lineWidth = 3;
                 ctx.stroke();
 
@@ -812,34 +916,32 @@
             ctx.translate(bike.x, bike.y);
             ctx.rotate(bike.angle);
             ctx.scale(bike.dir, 1);
-            ctx.lineCap = "square";
-            ctx.lineJoin = "miter";
+            ctx.lineCap = 'square';
+            ctx.lineJoin = 'miter';
 
-            ctx.strokeStyle = "rgba(255,255,255,0.1)";
-            ctx.lineWidth = 4;
-            ctx.strokeStyle = "rgba(255,255,255,0.1)";
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
             ctx.lineWidth = 4;
             ctx.beginPath();
             ctx.arc(-22, 12, 12, 0, Math.PI * 2);
             ctx.stroke();
             ctx.beginPath();
             ctx.arc(-22, 12, 8, 0, Math.PI * 2);
-            ctx.strokeStyle = colors.main;
-            ctx.lineWidth = 1;
+            ctx.strokeStyle = wheelColors.rear;
+            ctx.lineWidth = 1.5;
             ctx.stroke();
 
             ctx.beginPath();
             ctx.arc(25, 12, 12, 0, Math.PI * 2);
-            ctx.strokeStyle = "rgba(255,255,255,0.1)";
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
             ctx.lineWidth = 4;
             ctx.stroke();
             ctx.beginPath();
             ctx.arc(25, 12, 8, 0, Math.PI * 2);
-            ctx.strokeStyle = colors.main;
-            ctx.lineWidth = 1;
+            ctx.strokeStyle = wheelColors.front;
+            ctx.lineWidth = 1.5;
             ctx.stroke();
 
-            ctx.strokeStyle = "rgba(255,255,255,0.8)";
+            ctx.strokeStyle = 'rgba(255,255,255,0.8)';
             ctx.lineWidth = 2;
             ctx.beginPath();
 
@@ -931,18 +1033,18 @@
             ctx.restore();
 
             if (gameState === STATE_GAMEOVER) {
-                ctx.fillStyle = "rgba(0, 0, 0, 0.9)";
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = colors.alt;
-                ctx.font = "bold 55px sans-serif";
-                ctx.textAlign = "center";
-                ctx.fillText("CRASHED", canvas.width / 2, canvas.height / 2 - 40);
-                ctx.font = "30px sans-serif";
+                ctx.font = 'bold 55px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('CRASHED', canvas.width / 2, canvas.height / 2 - 40);
+                ctx.font = '30px sans-serif';
                 ctx.fillStyle = colors.scored;
                 ctx.fillText(`SCORE: ${score}`, canvas.width / 2, canvas.height / 2 + 10);
-                ctx.fillStyle = "#fff";
-                ctx.font = "16px sans-serif";
-                ctx.fillText("Click anywhere to restart!", canvas.width / 2, canvas.height / 2 + 70);
+                ctx.fillStyle = '#fff';
+                ctx.font = '16px sans-serif';
+                ctx.fillText('Click anywhere to restart!', canvas.width / 2, canvas.height / 2 + 70);
             }
         }
 
