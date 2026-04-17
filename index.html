@@ -100,6 +100,7 @@
 
         let genX = 0;
         let genY = 0;
+        let lastObstacleType = 'rect';
 
         const getCSSVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
         const colors = {
@@ -178,25 +179,28 @@
         function generateObstacle() {
             let gapX = 70 + Math.random() * 80;
             let startX = genX + gapX;
+            const fromTrickySupport = lastObstacleType === 'break' || lastObstacleType === 'seesaw';
 
-            let type = Math.floor(Math.random() * 14);
+            let type = Math.floor(Math.random() * 15);
 
             if (genY < 250) type = Math.max(type, 3);
             if (genY > 750) type = Math.min(type, 2);
 
             if (type === 0) {
                 let w = 30 + Math.random() * 80;
-                let y = genY + (Math.random() * 260 - 140);
+                let y = genY + (fromTrickySupport ? (Math.random() * 120 - 45) : (Math.random() * 260 - 140));
                 terrain.push({type: 'rect', x: startX, y: y, w: w, h: 30, landed: false});
                 genX = startX + w;
                 genY = y;
+                lastObstacleType = 'rect';
             }
             else if (type === 1) {
                 let r = 20 + Math.random() * 30;
-                let y = genY + (Math.random() * 200 - 100);
+                let y = genY + (fromTrickySupport ? (Math.random() * 100 - 35) : (Math.random() * 200 - 100));
                 terrain.push({type: 'circle', x: startX + r, y: y, r: r, landed: false});
                 genX = startX + r * 2;
                 genY = y - r;
+                lastObstacleType = 'circle';
             }
             else if (type === 2) {
                 let currX = startX;
@@ -209,6 +213,7 @@
                 }
                 genX = currX;
                 genY = currY + 40;
+                lastObstacleType = 'stairsUp';
             }
             else if (type === 3) {
                 let currX = startX;
@@ -221,6 +226,7 @@
                 }
                 genX = currX;
                 genY = currY - 40;
+                lastObstacleType = 'stairsDown';
             }
             else if (type === 4) {
                 let w = 80 + Math.random() * 50;
@@ -228,6 +234,7 @@
                 terrain.push({type: 'slope', x: startX, y: genY, w: w, h: h, angle: angle, landed: false});
                 genX = startX + w * Math.cos(angle);
                 genY = genY + w * Math.sin(angle);
+                lastObstacleType = 'slope';
             }
             else if (type === 5) {
                 let w = 80 + Math.random() * 50;
@@ -250,6 +257,7 @@
 
                 genX = currX;
                 genY = baseY;
+                lastObstacleType = 'gaps';
             }
             else if (type === 7) {
                 let baseY = genY + (Math.random() * 60 - 30);
@@ -263,6 +271,7 @@
 
                 genX = startX + lowW + gap + highW;
                 genY = baseY - stepUp;
+                lastObstacleType = 'stepUp';
             }
             else if (type === 8) {
                 let baseY = genY + (Math.random() * 50 - 25);
@@ -277,6 +286,7 @@
 
                 genX = landX + landW;
                 genY = baseY - 8;
+                lastObstacleType = 'kicker';
             }
             else if (type === 9) {
                 let currX = startX;
@@ -292,6 +302,7 @@
 
                 genX = currX;
                 genY = currY + 28;
+                lastObstacleType = 'pillarRise';
             }
             else if (type === 10) {
                 let w = 80 + Math.random() * 40;
@@ -303,6 +314,7 @@
                 });
                 genX = startX + w + 40;
                 genY = y;
+                lastObstacleType = 'moving';
             }
             else if (type === 11) {
                 let baseY = genY + (Math.random() * 40 - 20);
@@ -316,21 +328,23 @@
 
                 genX = startX + leadW + gap + landW;
                 genY = baseY;
+                lastObstacleType = 'laser';
             }
             else if (type === 12) {
                 let w = 60 + Math.random() * 30;
-                let y = genY + (Math.random() * 70 - 35);
+                let y = genY + (Math.random() * 50 - 20);
                 terrain.push({
                     type: 'break', x: startX, y: y, w: w, h: 24,
                     timer: 0, breaking: false, dead: false, landed: false
                 });
                 genX = startX + w + 35;
                 genY = y;
+                lastObstacleType = 'break';
             }
             else if (type === 13) {
                 let y = genY + (Math.random() * 60 - 30);
                 let size = (26 + Math.random() * 10) * 1.4;
-                let requiredWheel = Math.random() < 0.72 ? 'rear' : 'front';
+                let requiredWheel = Math.random() < 0.5 ? 'rear' : 'front';
 
                 terrain.push({
                     type: 'wheelGate',
@@ -350,6 +364,23 @@
 
                 genX = startX + size + 24;
                 genY = y;
+                lastObstacleType = 'wheelGate';
+            }
+            else if (type === 14) {
+                let y = genY + (Math.random() * 36 - 18);
+                let w = 92 + Math.random() * 28;
+                terrain.push({
+                    type: 'seesaw',
+                    x: startX,
+                    y: y,
+                    w: w,
+                    h: 18,
+                    angle: 0,
+                    landed: false
+                });
+                genX = startX + w + 34;
+                genY = y;
+                lastObstacleType = 'seesaw';
             }
         }
 
@@ -360,6 +391,7 @@
             updateHUD();
 
             genX = 0; genY = 600;
+            lastObstacleType = 'rect';
             terrain.push({ type: 'rect', x: 0, y: 600, w: 300, h: 50, landed: true });
             genX = 300;
 
@@ -486,7 +518,7 @@
                 let dist = Math.sqrt(dx*dx + dy*dy);
                 if (dist < radius + t.r) return { hit: true, nx: dx/dist, ny: dy/dist, pen: (radius + t.r) - dist };
             }
-            else if (t.type === 'slope') {
+            else if (t.type === 'slope' || t.type === 'seesaw') {
                 let cx = t.x + t.w/2;
                 let cy = t.y + t.h/2;
                 let dx = px - cx;
@@ -555,6 +587,10 @@
                         t.y += 0.9;
                     }
                     if (t.timer > 120) t.dead = true;
+                }
+                else if (t.type === 'seesaw') {
+                    t.angle *= 0.94;
+                    if (Math.abs(t.angle) < 0.0015) t.angle = 0;
                 }
             }
             terrain = terrain.filter(t => !t.dead && t.x > cameraX - 1000);
@@ -668,6 +704,12 @@
                             }
                         }
 
+                        if (t.type === 'seesaw') {
+                            const localOffset = clamp((wx - (t.x + t.w / 2)) / (t.w * 0.5), -1, 1);
+                            const desiredAngle = localOffset * 0.34;
+                            t.angle += (desiredAngle - t.angle) * 0.22;
+                        }
+
                         bike.x += c.nx * c.pen;
                         bike.y += c.ny * c.pen;
 
@@ -777,8 +819,8 @@
 
                 if (t.type === 'rect' || t.type === 'moving' || t.type === 'break' || t.type === 'wheelGate') {
                     if (t.type === 'break') {
-                        ctx.fillStyle = t.breaking ? 'rgba(255, 0, 140, 0.92)' : 'rgba(255, 0, 140, 0.42)';
-                        edgeColor = '#ff4dc4';
+                        ctx.fillStyle = colors.platform;
+                        edgeColor = colors.main;
                     }
 
                     if (t.type === 'wheelGate') {
@@ -803,6 +845,31 @@
                         ctx.stroke();
                     }
 
+                    if (t.type === 'break') {
+                        const crackColor = t.breaking ? 'rgba(0, 243, 255, 0.95)' : 'rgba(0, 243, 255, 0.72)';
+                        ctx.strokeStyle = crackColor;
+                        ctx.lineWidth = 1.8;
+
+                        ctx.beginPath();
+                        ctx.moveTo(t.x + t.w * 0.18, t.y + 5);
+                        ctx.lineTo(t.x + t.w * 0.36, t.y + t.h * 0.42);
+                        ctx.lineTo(t.x + t.w * 0.28, t.y + t.h - 5);
+                        ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.moveTo(t.x + t.w * 0.55, t.y + 4);
+                        ctx.lineTo(t.x + t.w * 0.48, t.y + t.h * 0.38);
+                        ctx.lineTo(t.x + t.w * 0.66, t.y + t.h * 0.62);
+                        ctx.lineTo(t.x + t.w * 0.58, t.y + t.h - 4);
+                        ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.moveTo(t.x + t.w * 0.8, t.y + 6);
+                        ctx.lineTo(t.x + t.w * 0.72, t.y + t.h * 0.34);
+                        ctx.lineTo(t.x + t.w * 0.84, t.y + t.h * 0.56);
+                        ctx.stroke();
+                    }
+
                     if (t.type === 'wheelGate') {
                         const cx = t.x + t.w / 2;
                         const cy = t.y + t.h / 2;
@@ -814,10 +881,11 @@
 
                         ctx.setLineDash([]);
                         ctx.lineCap = 'butt';
+                        ctx.strokeStyle = t.landed ? colors.scored : (t.requiredWheel === 'front' ? wheelColors.front : wheelColors.rear);
+                        ctx.lineWidth = 2.2;
                         ctx.beginPath();
-                        ctx.fillStyle = t.landed ? colors.scored : (t.requiredWheel === 'rear' ? wheelColors.rear : wheelColors.front);
                         ctx.arc(cx, cy, r * 0.78, 0, Math.PI * 2);
-                        ctx.fill();
+                        ctx.stroke();
 
                         ctx.restore();
                     }
@@ -844,6 +912,36 @@
                     ctx.stroke();
                     ctx.restore();
                 }
+                else if (t.type === 'seesaw') {
+                    const cx = t.x + t.w / 2;
+                    const cy = t.y + t.h / 2;
+                    ctx.save();
+                    ctx.translate(cx, cy);
+                    ctx.rotate(t.angle);
+                    ctx.translate(-cx, -cy);
+                    ctx.fillStyle = colors.platform;
+                    ctx.fillRect(t.x, t.y, t.w, t.h);
+                    ctx.beginPath();
+                    ctx.moveTo(t.x, t.y + 1);
+                    ctx.lineTo(t.x + t.w, t.y + 1);
+                    ctx.lineWidth = t.landed ? 3 : 2;
+                    ctx.strokeStyle = t.landed ? colors.scored : colors.main;
+                    ctx.stroke();
+                    ctx.restore();
+
+                    ctx.beginPath();
+                    ctx.moveTo(cx - 16, t.y + t.h + 12);
+                    ctx.lineTo(cx, t.y + t.h - 2);
+                    ctx.lineTo(cx + 16, t.y + t.h + 12);
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = 'rgba(255,255,255,0.32)';
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.arc(cx, t.y + t.h - 1, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(255,255,255,0.72)';
+                    ctx.fill();
+                }
                 else if (t.type === 'laser') {
                     ctx.fillStyle = 'rgba(255, 0, 85, 0.16)';
                     ctx.fillRect(t.x, t.y, t.w, t.h);
@@ -863,9 +961,9 @@
             for (let t of terrain) {
                 if (t.type === 'wheelGate' && t.showHint && !t.triggered) {
                     const lines = [
-                        'Circle color shows',
-                        'which wheel must',
-                        'touch first'
+                        'Cyan ring = rear wheel',
+                        'Pink ring = front wheel',
+                        'Touch first with that wheel'
                     ];
                     const baseX = t.x + t.w / 2;
                     const baseY = t.y - 44;
@@ -873,7 +971,7 @@
                     ctx.save();
                     ctx.textAlign = 'center';
                     ctx.font = 'bold 16px system-ui, sans-serif';
-                    ctx.fillStyle = '#ffffff';
+                    ctx.fillStyle = ctx.strokeStyle;
                     ctx.strokeStyle = 'rgba(0,0,0,0.8)';
                     ctx.lineWidth = 5;
 
@@ -953,7 +1051,7 @@
             ctx.lineWidth = 2.2;
             ctx.stroke();
 
-            ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+            ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 2;
             ctx.beginPath();
 
