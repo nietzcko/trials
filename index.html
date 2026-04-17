@@ -112,14 +112,13 @@
 
         const wheelColors = {
             rear: '#00f3ff',
-            front: '#ff0055'
+            front: '#00f3ff'
         };
 
         let tutorialShown = {
             wheelOrder: false
         };
 
-        let worldHint = null;
 
         const jumpPower = 0.045;
         const gravity = 0.4;
@@ -173,7 +172,7 @@
         }
 
         function getWheelPlatformFill(requiredWheel) {
-            return requiredWheel === 'rear' ? 'rgba(0, 243, 255, 0.24)' : 'rgba(255, 0, 85, 0.24)';
+            return 'rgba(23, 29, 37, 0.96)';
         }
 
         function generateObstacle() {
@@ -330,7 +329,7 @@
             }
             else if (type === 13) {
                 let y = genY + (Math.random() * 60 - 30);
-                let size = 26 + Math.random() * 10;
+                let size = (26 + Math.random() * 10) * 1.4;
                 let requiredWheel = Math.random() < 0.5 ? 'rear' : 'front';
 
                 terrain.push({
@@ -347,15 +346,9 @@
 
                 if (!tutorialShown.wheelOrder) {
                     tutorialShown.wheelOrder = true;
-                    worldHint = {
-                        type: 'wheelOrder',
-                        targetX: startX + size / 2,
-                        targetY: y - 24,
-                        timer: 360
-                    };
                 }
 
-                genX = startX + size + 45;
+                genX = startX + size + 24;
                 genY = y;
             }
         }
@@ -364,7 +357,6 @@
             score = 0;
             terrain = [];
             tutorialShown.wheelOrder = false;
-            worldHint = null;
             updateHUD();
 
             genX = 0; genY = 600;
@@ -567,10 +559,6 @@
             }
             terrain = terrain.filter(t => !t.dead && t.x > cameraX - 1000);
 
-            if (worldHint) {
-                worldHint.timer--;
-                if (worldHint.timer <= 0) worldHint = null;
-            }
 
             bike.vy += gravity;
 
@@ -669,6 +657,7 @@
                         if (t.type === 'wheelGate' && !t.triggered) {
                             if (p.name === 'rear' || p.name === 'front') {
                                 t.triggered = true;
+                                t.showHint = false;
                                 if (p.name !== t.requiredWheel) {
                                     gameState = STATE_GAMEOVER;
                                     return;
@@ -815,11 +804,59 @@
                     }
 
                     if (t.type === 'wheelGate') {
-                        ctx.beginPath();
+                        const cx = t.x + t.w / 2;
+                        const cy = t.y + t.h / 2;
+                        const r = Math.min(t.w, t.h) * 0.22;
+
+                        ctx.save();
                         ctx.strokeStyle = t.landed ? colors.scored : edgeColor;
                         ctx.lineWidth = 2;
-                        ctx.arc(t.x + t.w / 2, t.y + t.h / 2, Math.min(t.w, t.h) * 0.22, 0, Math.PI * 2);
+
+                        ctx.setLineDash([]);
+                        ctx.lineCap = 'round';
+
+                        const rearIconColor = t.requiredWheel === 'rear' ? '#35ff7a' : '#ff4d6d';
+                        const frontIconColor = t.requiredWheel === 'front' ? '#35ff7a' : '#ff4d6d';
+                        const wheelR = r * 0.38;
+                        const rearX = cx - r * 0.78;
+                        const frontX = cx + r * 0.78;
+                        const wheelY = cy + r * 0.18;
+                        const frameColor = t.landed ? colors.scored : 'rgba(255,255,255,0.92)';
+
+                        ctx.beginPath();
+                        ctx.fillStyle = rearIconColor;
+                        ctx.arc(rearX, wheelY, wheelR, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        ctx.beginPath();
+                        ctx.fillStyle = frontIconColor;
+                        ctx.arc(frontX, wheelY, wheelR, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        ctx.strokeStyle = frameColor;
+                        ctx.lineWidth = 1.6;
+
+                        ctx.beginPath();
+                        ctx.moveTo(rearX, wheelY);
+                        ctx.lineTo(cx - r * 0.1, cy);
+                        ctx.lineTo(cx + r * 0.22, cy - r * 0.45);
+                        ctx.lineTo(frontX, wheelY);
+                        ctx.moveTo(cx + r * 0.22, cy - r * 0.45);
+                        ctx.lineTo(cx - r * 0.28, cy - r * 0.08);
+                        ctx.lineTo(rearX, wheelY);
+                        ctx.moveTo(cx - r * 0.28, cy - r * 0.08);
+                        ctx.lineTo(cx - r * 0.1, cy);
+                        ctx.moveTo(cx + r * 0.22, cy - r * 0.45);
+                        ctx.lineTo(cx + r * 0.45, cy - r * 0.8);
+                        ctx.lineTo(cx + r * 0.66, cy - r * 0.92);
                         ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.fillStyle = frameColor;
+                        ctx.arc(cx + r * 0.78, cy - r * 1.12, r * 0.22, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        ctx.restore();
                     }
                 }
                 else if (t.type === 'circle') {
@@ -860,18 +897,30 @@
                 }
             }
 
-            if (worldHint && worldHint.type === 'wheelOrder') {
-                ctx.save();
-                ctx.globalAlpha = Math.min(1, worldHint.timer / 40 + 0.15);
-                ctx.textAlign = 'center';
-                ctx.font = 'bold 18px system-ui, sans-serif';
-                ctx.fillStyle = '#ffffff';
-                ctx.strokeStyle = 'rgba(0,0,0,0.75)';
-                ctx.lineWidth = 5;
-                const text = 'A blokk színével egyező kerék érkezzen először!';
-                ctx.strokeText(text, worldHint.targetX, worldHint.targetY);
-                ctx.fillText(text, worldHint.targetX, worldHint.targetY);
-                ctx.restore();
+            for (let t of terrain) {
+                if (t.type === 'wheelGate' && t.showHint && !t.triggered) {
+                    const lines = [
+                        'Bike icon shows',
+                        'which wheel must',
+                        'touch first'
+                    ];
+                    const baseX = t.x + t.w / 2;
+                    const baseY = t.y - 44;
+
+                    ctx.save();
+                    ctx.textAlign = 'center';
+                    ctx.font = 'bold 16px system-ui, sans-serif';
+                    ctx.fillStyle = '#ffffff';
+                    ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+                    ctx.lineWidth = 5;
+
+                    for (let i = 0; i < lines.length; i++) {
+                        const y = baseY + i * 18;
+                        ctx.strokeText(lines[i], baseX, y);
+                        ctx.fillText(lines[i], baseX, y);
+                    }
+                    ctx.restore();
+                }
             }
 
             if (isDragging && gameState === STATE_PLAYING) {
@@ -927,7 +976,7 @@
             ctx.beginPath();
             ctx.arc(-22, 12, 8, 0, Math.PI * 2);
             ctx.strokeStyle = wheelColors.rear;
-            ctx.lineWidth = 1.5;
+            ctx.lineWidth = 2.4;
             ctx.stroke();
 
             ctx.beginPath();
@@ -935,11 +984,15 @@
             ctx.strokeStyle = 'rgba(255,255,255,0.1)';
             ctx.lineWidth = 4;
             ctx.stroke();
+            ctx.save();
             ctx.beginPath();
+            ctx.setLineDash([1, 5]);
+            ctx.lineCap = 'round';
             ctx.arc(25, 12, 8, 0, Math.PI * 2);
             ctx.strokeStyle = wheelColors.front;
-            ctx.lineWidth = 1.5;
+            ctx.lineWidth = 2.2;
             ctx.stroke();
+            ctx.restore();
 
             ctx.strokeStyle = 'rgba(255,255,255,0.8)';
             ctx.lineWidth = 2;
