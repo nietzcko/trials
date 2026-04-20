@@ -102,6 +102,14 @@
         let genY = 0;
         let lastObstacleType = 'rect';
 
+        const sessionSeed = Math.floor(Math.random() * 2147483647) || 1;
+        let randSeed = sessionSeed;
+
+        function rand() {
+            randSeed = (randSeed * 16807) % 2147483647;
+            return (randSeed - 1) / 2147483646;
+        }
+
         const getCSSVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
         const colors = {
             main: getCSSVar('--neon-main'),
@@ -177,26 +185,26 @@
         }
 
         function generateObstacle() {
-            let gapX = 70 + Math.random() * 80;
+            let gapX = 70 + rand() * 80;
             let startX = genX + gapX;
             const fromTrickySupport = lastObstacleType === 'break' || lastObstacleType === 'seesaw';
 
-            let type = Math.floor(Math.random() * 15);
+            let type = Math.floor(rand() * 15);
 
             if (genY < 250) type = Math.max(type, 3);
             if (genY > 750) type = Math.min(type, 2);
 
             if (type === 0) {
-                let w = 30 + Math.random() * 80;
-                let y = genY + (fromTrickySupport ? (Math.random() * 120 - 45) : (Math.random() * 260 - 140));
+                let w = 30 + rand() * 80;
+                let y = genY + (fromTrickySupport ? (rand() * 120 - 45) : (rand() * 260 - 140));
                 terrain.push({type: 'rect', x: startX, y: y, w: w, h: 30, landed: false});
                 genX = startX + w;
                 genY = y;
                 lastObstacleType = 'rect';
             }
             else if (type === 1) {
-                let r = 20 + Math.random() * 30;
-                let y = genY + (fromTrickySupport ? (Math.random() * 100 - 35) : (Math.random() * 200 - 100));
+                let r = 20 + rand() * 30;
+                let y = genY + (fromTrickySupport ? (rand() * 100 - 35) : (rand() * 200 - 100));
                 terrain.push({type: 'circle', x: startX + r, y: y, r: r, landed: false});
                 genX = startX + r * 2;
                 genY = y - r;
@@ -205,11 +213,11 @@
             else if (type === 2) {
                 let currX = startX;
                 let currY = genY;
-                let stepW = 30 + Math.random() * 20;
+                let stepW = 30 + rand() * 20;
                 for(let i=0; i<3; i++) {
                     terrain.push({type: 'rect', x: currX, y: currY, w: stepW, h: 40, landed: false});
                     currX += stepW + 10;
-                    currY -= (40 + Math.random() * 20);
+                    currY -= (40 + rand() * 20);
                 }
                 genX = currX;
                 genY = currY + 40;
@@ -218,18 +226,18 @@
             else if (type === 3) {
                 let currX = startX;
                 let currY = genY;
-                let stepW = 30 + Math.random() * 20;
+                let stepW = 30 + rand() * 20;
                 for(let i=0; i<3; i++) {
                     terrain.push({type: 'rect', x: currX, y: currY, w: stepW, h: 40, landed: false});
                     currX += stepW + 10;
-                    currY += (40 + Math.random() * 20);
+                    currY += (40 + rand() * 20);
                 }
                 genX = currX;
                 genY = currY - 40;
                 lastObstacleType = 'stairsDown';
             }
             else if (type === 4) {
-                let w = 80 + Math.random() * 50;
+                let w = 80 + rand() * 50;
                 let h = 25; let angle = -0.45;
                 terrain.push({type: 'slope', x: startX, y: genY, w: w, h: h, angle: angle, landed: false});
                 genX = startX + w * Math.cos(angle);
@@ -237,7 +245,7 @@
                 lastObstacleType = 'slope';
             }
             else if (type === 5) {
-                let w = 80 + Math.random() * 50;
+                let w = 80 + rand() * 50;
                 let h = 25; let angle = 0.45;
                 terrain.push({type: 'slope', x: startX, y: genY, w: w, h: h, angle: angle, landed: false});
                 genX = startX + w * Math.cos(angle);
@@ -245,12 +253,12 @@
             }
             else if (type === 6) {
                 let currX = startX;
-                let baseY = genY + (Math.random() * 80 - 40);
-                let count = 2 + Math.floor(Math.random() * 3);
+                let baseY = genY + (rand() * 80 - 40);
+                let count = 2 + Math.floor(rand() * 3);
 
                 for (let i = 0; i < count; i++) {
-                    let w = 24 + Math.random() * 22;
-                    let gap = 35 + Math.random() * 45;
+                    let w = 24 + rand() * 22;
+                    let gap = 35 + rand() * 45;
                     terrain.push({type: 'rect', x: currX, y: baseY, w: w, h: 22, landed: false});
                     currX += w + gap;
                 }
@@ -260,11 +268,11 @@
                 lastObstacleType = 'gaps';
             }
             else if (type === 7) {
-                let baseY = genY + (Math.random() * 60 - 30);
-                let lowW = 36 + Math.random() * 18;
-                let highW = 34 + Math.random() * 18;
-                let gap = 18 + Math.random() * 18;
-                let stepUp = 45 + Math.random() * 30;
+                let baseY = genY + (rand() * 60 - 30);
+                let lowW = 36 + rand() * 18;
+                let highW = 34 + rand() * 18;
+                let gap = 18 + rand() * 18;
+                let stepUp = 45 + rand() * 30;
 
                 terrain.push({type: 'rect', x: startX, y: baseY, w: lowW, h: 24, landed: false});
                 terrain.push({type: 'rect', x: startX + lowW + gap, y: baseY - stepUp, w: highW, h: 24, landed: false});
@@ -274,11 +282,11 @@
                 lastObstacleType = 'stepUp';
             }
             else if (type === 8) {
-                let baseY = genY + (Math.random() * 50 - 25);
-                let kickerW = 26 + Math.random() * 12;
+                let baseY = genY + (rand() * 50 - 25);
+                let kickerW = 26 + rand() * 12;
                 let kickerH = 20;
-                let gap = 28 + Math.random() * 24;
-                let landW = 54 + Math.random() * 28;
+                let gap = 28 + rand() * 24;
+                let landW = 54 + rand() * 28;
 
                 terrain.push({type: 'slope', x: startX, y: baseY, w: kickerW, h: kickerH, angle: -0.32, landed: false});
                 let landX = startX + kickerW + gap;
@@ -290,14 +298,14 @@
             }
             else if (type === 9) {
                 let currX = startX;
-                let currY = genY + (Math.random() * 40 - 20);
-                let count = 3 + Math.floor(Math.random() * 2);
+                let currY = genY + (rand() * 40 - 20);
+                let count = 3 + Math.floor(rand() * 2);
 
                 for (let i = 0; i < count; i++) {
-                    let w = 22 + Math.random() * 14;
+                    let w = 22 + rand() * 14;
                     terrain.push({type: 'rect', x: currX, y: currY, w: w, h: 20, landed: false});
-                    currX += w + (18 + Math.random() * 18);
-                    currY -= 24 + Math.random() * 18;
+                    currX += w + (18 + rand() * 18);
+                    currY -= 24 + rand() * 18;
                 }
 
                 genX = currX;
@@ -305,22 +313,22 @@
                 lastObstacleType = 'pillarRise';
             }
             else if (type === 10) {
-                let w = 80 + Math.random() * 40;
-                let y = genY + (Math.random() * 80 - 40);
+                let w = 80 + rand() * 40;
+                let y = genY + (rand() * 80 - 40);
                 terrain.push({
                     type: 'moving', x: startX, y: y, baseX: startX, w: w, h: 22,
-                    range: 28 + Math.random() * 18, speed: 0.002 + Math.random() * 0.003,
-                    phase: Math.random() * Math.PI * 2, moveDX: 0, landed: false
+                    range: 28 + rand() * 18, speed: 0.002 + rand() * 0.003,
+                    phase: rand() * Math.PI * 2, moveDX: 0, landed: false
                 });
                 genX = startX + w + 40;
                 genY = y;
                 lastObstacleType = 'moving';
             }
             else if (type === 11) {
-                let baseY = genY + (Math.random() * 40 - 20);
-                let leadW = 86 + Math.random() * 32;
-                let gap = 32 + Math.random() * 12;
-                let landW = 58 + Math.random() * 24;
+                let baseY = genY + (rand() * 40 - 20);
+                let leadW = 86 + rand() * 32;
+                let gap = 32 + rand() * 12;
+                let landW = 58 + rand() * 24;
 
                 terrain.push({type: 'rect', x: startX, y: baseY, w: leadW, h: 24, landed: false});
                 terrain.push({type: 'laser', x: startX + leadW + gap * 0.5, y: baseY - 50, w: 8, h: 30, landed: false});
@@ -331,8 +339,8 @@
                 lastObstacleType = 'laser';
             }
             else if (type === 12) {
-                let w = 60 + Math.random() * 30;
-                let y = genY + (Math.random() * 50 - 20);
+                let w = 60 + rand() * 30;
+                let y = genY + (rand() * 50 - 20);
                 terrain.push({
                     type: 'break', x: startX, y: y, w: w, h: 24,
                     timer: 0, breaking: false, dead: false, landed: false
@@ -342,9 +350,9 @@
                 lastObstacleType = 'break';
             }
             else if (type === 13) {
-                let y = genY + (Math.random() * 60 - 30);
-                let size = (26 + Math.random() * 10) * 1.4;
-                let requiredWheel = Math.random() < 0.5 ? 'rear' : 'front';
+                let y = genY + (rand() * 60 - 30);
+                let size = (26 + rand() * 10) * 1.4;
+                let requiredWheel = rand() < 0.5 ? 'rear' : 'front';
 
                 terrain.push({
                     type: 'wheelGate',
@@ -367,8 +375,8 @@
                 lastObstacleType = 'wheelGate';
             }
             else if (type === 14) {
-                let y = genY + (Math.random() * 36 - 18);
-                let w = 92 + Math.random() * 28;
+                let y = genY + (rand() * 36 - 18);
+                let w = 92 + rand() * 28;
                 terrain.push({
                     type: 'seesaw',
                     x: startX,
@@ -387,6 +395,7 @@
         function initGame() {
             score = 0;
             terrain = [];
+            randSeed = sessionSeed;
             tutorialShown.wheelOrder = false;
             updateHUD();
 
